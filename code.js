@@ -13,11 +13,13 @@ const enemies = []
 const bullets = []
 const particles = []
 const guns = []
-
 const worldBorder = {x:1000,y:1000}
 const camera = {x:0,y:0}
 
-
+// FPS 
+var fps;
+var fpsLimit = 10
+var startTime = performance.now()
 ///------ASSETS-------///////// 
 
 var background = new Image()
@@ -58,7 +60,6 @@ const noises = []
 sounds.reload.accessKey = "reload"
 sounds.noammo.accessKey = "noammo"
 sounds.walk.accessKey = 'walk'
-
 //////------------//////////
 class Player{
     constructor(ctx,position){
@@ -103,20 +104,19 @@ class Player{
         reloadCancel:false
       }
       if(this.weapon == 1){
-        this.gun.firerate =500
+        this.gun.firerate = 500 * fps/60
         
       }
       if(this.weapon == 3){
-        this.gun.firerate = 100
+        this.gun.firerate = 100 * fps/60
         
       }
       if(this.weapon == 2){
-        this.gun.firerate = 1000
+        this.gun.firerate = 1000 * fps/60
         
       }
       if(this.weapon == 4){
-        this.gun.firerate = 50
-        
+        this.gun.firerate = 50 * fps/60
       }
       //////////
       this.health = 100
@@ -125,9 +125,9 @@ class Player{
         x:0,
         y:0
       }
-      this.terminalVelocity = 4
+      this.terminalVelocity = 100 * 1/fps
       this.frictionCoefficient = 0.8
-      this.acceleration = 1
+      this.acceleration = 30 * 1/fps
       this.size = {height:20,width:20}
       this.angle = 0
     }
@@ -141,7 +141,8 @@ class Player{
       this.rotate()
       // ATTACK
       this.arm()
-      this.shoot() 
+      this.shoot()
+      this.weaponInfo() 
       // THROW AND PICKUP WEAPON 
       this.throw()
       this.pickup()
@@ -161,6 +162,9 @@ class Player{
       this.ammo()
         // HTML 
         this.HTMLINFO()
+      // COLLISION 
+      this.collision()
+
     }
     HTMLINFO(){
       document.getElementById('magCount').innerHTML = this.mag +"/"+this.bullets.inAction
@@ -193,6 +197,13 @@ class Player{
     }
     rotate(){
       this.angle = Math.atan2(mouse.pos.y-this.position.y-this.size.height/2,mouse.pos.x-this.position.x-this.size.width/2)
+    }
+    collision(){
+      obstacles.forEach((obstacle)=>{
+        if (Collision(this,obstacle)){
+          CollisionCorrection(this,obstacle)
+        }
+       })
     }
     mapLimit(){
       if(this.position.x < 0){
@@ -380,19 +391,19 @@ class Player{
     }
     weaponInfo(){
       if(this.weapon == 1){
-        this.gun.firerate = 500
+        this.gun.firerate = 500 * fps/30
         this.bullets.LowAmmo = 3
       }
       if(this.weapon == 3){
-        this.gun.firerate = 100
+        this.gun.firerate = 100 * fps/30
         this.bullets.LowAmmo = 5
       }
       if(this.weapon == 2){
-        this.gun.firerate = 1000
+        this.gun.firerate = 1000 * fps/30
         this.bullets.LowAmmo = 2
       }
       if(this.weapon == 4){
-        this.gun.firerate = 50
+        this.gun.firerate = 50 * fps/30
         this.bullets.LowAmmo = 5
       }
     }
@@ -585,7 +596,6 @@ class Player{
         if(Collision(this,gun) && keys.e.pressed && this.pickupbool){
            guns.splice(i,1)
            this.weapon = gun.type
-           this.weaponInfo()
            noises.push(sounds.pickup.cloneNode())
            this.mag = gun.mag
            this.pickupbool = false
@@ -603,6 +613,9 @@ class Player{
         this.knockback.y *= 0.8
       }
       else {this.knockback.y = 0}
+
+      this.terminalVelocity = 100 * 1/fps
+      this.acceleration = 30 * 1/fps
     }
 }
 
@@ -662,6 +675,11 @@ class Particle{
       width:10*Math.random() + this.partiType*10
     }
   } 
+  init(){
+    this.draw()
+    this.update()
+    this.collision()
+  }
   draw(){
     this.ctx.save()
     this.ctx.globalAlpha = this.opacity
@@ -689,6 +707,13 @@ class Particle{
     }
     this.ctx.restore()
   }
+  collision(){
+    obstacles.forEach((obstacle)=> {
+      if(Collision(this,obstacle)){
+        CollisionCorrection(this,obstacle)
+    }
+    }) 
+  }
   update(){
     this.opacity *= 0.95 + 0.03*this.partiType
     this.position.x += this.velocity.x 
@@ -698,7 +723,7 @@ class Particle{
     if (this.opacity < 0.01){
       particles.splice(particles.indexOf(this),1)
     }
-    this.draw()
+    
   }
 }
 
@@ -890,7 +915,7 @@ class Enemy{
       this.position = position
       this.velocity = {x:0,y:0}
       this.size = {width:20,height:20}
-      this.speed = 3
+      this.speed = 100 * 1/fps
       this.angle = 0
       this.idle = {
         bool:true,
@@ -931,6 +956,21 @@ class Enemy{
         ready:false,
         reactionTime:300
       }
+      if(this.weapon == 1){
+        this.gun.firerate = 500 * fps/60
+        
+      }
+      if(this.weapon == 3){
+        this.gun.firerate = 100 * fps/60
+        
+      }
+      if(this.weapon == 2){
+        this.gun.firerate = 1000 * fps/60
+        
+      }
+      if(this.weapon == 4){
+        this.gun.firerate = 50 * fps/60
+      }
       this.health = 50
       this.knockback = {
         x:0,y:0
@@ -958,7 +998,9 @@ class Enemy{
      // OUT OF BOUNDS 
      this.mapLimit()
      this.outofbounds()
+     // ATTACK
      this.attack()
+     this.weaponInfo()
       // DEMISE
       if(this.health <= 0){
         this.death()
@@ -968,6 +1010,15 @@ class Enemy{
       
       // RELOAD 
       this.reload()
+      // COLLISION
+      this.collision()
+    }
+    collision(){
+      obstacles.forEach((obstacle)=>{
+        if (Collision(this,obstacle)){
+          CollisionCorrection(this,obstacle)
+        }
+       })
     }
     mapLimit(){
       if(this.position.x < 0){
@@ -1099,6 +1150,24 @@ class Enemy{
       //TRACE PATH 
        } 
     }
+    weaponInfo(){
+      if(this.weapon == 1){
+        this.gun.firerate = 500 * fps/30
+        this.gun.attackrange = 200
+       }
+       if(this.weapon == 3){
+        this.gun.firerate = 100* fps/30
+        this.gun.attackrange = 150
+       }
+       if(this.weapon == 2){
+        this.gun.firerate = 1000* fps/30
+        this.gun.attackrange = 50
+       }
+       if(this.weapon == 4){
+        this.gun.firerate = 50* fps/30
+        this.gun.attackrange = 100
+       }
+    }
     attack(){
       players.forEach((player)=>{
       var distance = Math.sqrt((player.position.x+player.size.width/2 - this.position.x-this.size.width/2)**2 + (player.position.y+player.size.height/2 - this.position.y-this.size.height/2)**2)
@@ -1133,22 +1202,6 @@ class Enemy{
              this.fist.attacked = false}
           }
        
-     }
-     if(this.weapon == 1){
-      this.gun.firerate = 500
-      this.gun.attackrange = 200
-     }
-     if(this.weapon == 3){
-      this.gun.firerate = 100
-      this.gun.attackrange = 150
-     }
-     if(this.weapon == 2){
-      this.gun.firerate = 1000
-      this.gun.attackrange = 50
-     }
-     if(this.weapon == 4){
-      this.gun.firerate = 50
-      this.gun.attackrange = 100
      }
     if(this.aware && this.weapon > 0){
      if(this.gun.attackrange > distance){
@@ -1231,14 +1284,14 @@ class Enemy{
       if (this.idle.bool && !this.idle.active && !this.aware && !this.alerted){
         
       this.idle.active = true
-      this.speed = 1
+      this.speed = 25 * 1/fps
       var interval = setInterval(()=>{
        if(this.idle.bool){
         this.angle = 2*Math.PI*Math.random() - Math.PI
           if (Math.random()<0.3){
             this.speed = 0
           }
-          else {this.speed = 1}
+          else {this.speed = 25 * 1 /fps}
        }
        else {clearInterval(interval)}
        
@@ -1458,6 +1511,18 @@ class Gun{
    ]
    this.size = this.sizes[this.type-1]
   }
+  init(){
+    this.update()
+    this.draw()
+    this.collision()
+  }
+  collision(){
+    obstacles.forEach((obstacle)=>{
+      if(Collision(this,obstacle)){
+        CollisionCorrection(this,obstacle)
+      }
+    })
+  }
   draw(){
     this.ctx.save()
     //this.ctx.rect(this.position.x,this.position.y,this.size.width,this.size.height)
@@ -1487,11 +1552,15 @@ class Gun{
     this.rotation *= 0.8
     this.velocity.x *= 0.8
     this.velocity.y *= 0.8
-    this.draw()
   }
 }
 
 function gameLoop(){
+    // FPS COMPUTE  
+    var elapsedTime = performance.now() - startTime;
+    fps = Math.round(1000 / elapsedTime)
+    startTime = performance.now();
+    
     // AUDIO
     noises.forEach((noise,index)=>{
       if(Math.round(noise.duration*10) <= Math.round(noise.currentTime*10)){
@@ -1509,11 +1578,10 @@ function gameLoop(){
     ctx.save()
     // CAMERA
     ctx.translate(-camera.x,-camera.y)
-
     ctx.fillStyle = '#c49b72'
     ctx.fillRect(0,0,canvas.width+camera.x,canvas.height+camera.y)
     ctx.fillStyle = 'white'
-// TILING
+    // TILING
     ctx.globalAlpha = 0.5
     for (let i = 0;i<canvas.width+camera.x;i+= 100){
       for ( let j = 0;j <canvas.height+camera.y;j+= 100){
@@ -1524,38 +1592,19 @@ function gameLoop(){
 
     ctx.globalAlpha = 1
     guns.forEach((gun)=>{
-      gun.update()
-      obstacles.forEach((obstacle)=>{
-        if(Collision(gun,obstacle)){
-          CollisionCorrection(gun,obstacle)
-        }
-      })
+      gun.init()
     })
 
     bullets.forEach((bullet)=>{
       bullet.init()
     })
     particles.forEach((particle)=>{
-      particle.update()
-      obstacles.forEach((obstacle)=> {
-        if(Collision(particle,obstacle)){
-          CollisionCorrection(particle,obstacle)
-      }
-      }) 
+      particle.init()
     })
 
     players.forEach((player)=>{
        player.init()
-
-
-       obstacles.forEach((obstacle)=>{
-        if (Collision(player,obstacle)){
-          CollisionCorrection(player,obstacle)
-        }
-        
-       })
       // PLAYER DETECTION AND SUCH
-      
       enemies.forEach((enemy)=>{
         if(Collision(player,enemy)){
           CollisionCorrection(enemy,player)
@@ -1599,12 +1648,6 @@ function gameLoop(){
     
     enemies.forEach((enemy)=>{
       enemy.init()
-       
-      obstacles.forEach((obstacle)=>{
-        if (Collision(enemy,obstacle)){
-          CollisionCorrection(enemy,obstacle)
-        }
-       })
      enemies.forEach((enemy2)=>{
       if(Collision(enemy,enemy2) && enemy != enemy2){
         CollisionCorrection(enemy,enemy2)
@@ -1683,7 +1726,7 @@ function RectInRect(enemy,tile){
 }
 function Collision(player,obstacle){
   return player.position.x+player.size.width > obstacle.position.x &&(obstacle.position.x+obstacle.size.width) > player.position.x && player.position.y+player.size.height > obstacle.position.y&&obstacle.position.y+obstacle.size.height > player.position.y
-   }
+  }
 
 function CollisionCorrection(player,obstacle){
   if(
@@ -1707,7 +1750,7 @@ function CollisionCorrection(player,obstacle){
         player.velocity.y = 0}
     }}
       
-    }
+  }
 function resize(){
     rect = canvas.getBoundingClientRect()  
     document.querySelector(':root').style.setProperty('--window',Math.sqrt(innerHeight**2+innerWidth**2)/50+"px")
@@ -1773,18 +1816,11 @@ guns.push(new Gun(ctx,{x:50,y:50},{x:0,y:0},2,25))
 document.querySelector(':root').style.setProperty('--window',Math.sqrt(innerHeight**2+innerWidth**2)/50+"px")
 
 enemies.push(new Enemy(ctx,{x:600,y:500},1))
-enemies.push(new Enemy(ctx,{x:500,y:500},2))
-enemies.push(new Enemy(ctx,{x:500,y:900},3))
-enemies.push(new Enemy(ctx,{x:500,y:900},4))
-enemies.push(new Enemy(ctx,{x:500,y:500},0))
-enemies.push(new Enemy(ctx,{x:200,y:700},1))
-enemies.push(new Enemy(ctx,{x:500,y:700},0))
-enemies.push(new Enemy(ctx,{x:400,y:500},0))
-
-
-
-
-
-
-
+//enemies.push(new Enemy(ctx,{x:500,y:500},2))
+//enemies.push(new Enemy(ctx,{x:500,y:900},3))
+//enemies.push(new Enemy(ctx,{x:500,y:900},4))
+//enemies.push(new Enemy(ctx,{x:500,y:500},0))
+//enemies.push(new Enemy(ctx,{x:200,y:700},1))
+//enemies.push(new Enemy(ctx,{x:500,y:700},0))
+//enemies.push(new Enemy(ctx,{x:400,y:500},0))
 
