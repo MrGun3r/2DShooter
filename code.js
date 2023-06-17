@@ -1772,15 +1772,14 @@ guns.push(new Gun(ctx,{x:50,y:50},{x:0,y:0},2,25))
 
 document.querySelector(':root').style.setProperty('--window',Math.sqrt(innerHeight**2+innerWidth**2)/50+"px")
 
-//enemies.push(new Enemy(ctx,{x:600,y:500},1))
-//enemies.push(new Enemy(ctx,{x:500,y:500},2))
-//enemies.push(new Enemy(ctx,{x:500,y:900},3))
-//enemies.push(new Enemy(ctx,{x:500,y:900},4))
-//enemies.push(new Enemy(ctx,{x:500,y:500},0))
-//enemies.push(new Enemy(ctx,{x:200,y:700},1))
-//enemies.push(new Enemy(ctx,{x:500,y:700},0))
-//enemies.push(new Enemy(ctx,{x:400,y:500},0))
-
+enemies.push(new Enemy(ctx,{x:600,y:500},1))
+enemies.push(new Enemy(ctx,{x:500,y:500},2))
+enemies.push(new Enemy(ctx,{x:500,y:900},3))
+enemies.push(new Enemy(ctx,{x:500,y:900},4))
+enemies.push(new Enemy(ctx,{x:500,y:500},0))
+enemies.push(new Enemy(ctx,{x:200,y:700},1))
+enemies.push(new Enemy(ctx,{x:500,y:700},0))
+enemies.push(new Enemy(ctx,{x:400,y:500},0))
 
 
 
