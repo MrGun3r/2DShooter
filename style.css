@@ -1,0 +1,82 @@
+:root{
+    --health:0;
+    --mag:0;
+    --window:0
+}
+*{
+    margin:0; padding:0;
+    overflow: hidden;
+    background-color: transparent;
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and IE 11 */
+    user-select: none; /* Standard syntax */
+    font-size: var(--window);
+}
+@font-face {
+    font-family: pixelFont;
+    src: url(font/upheavtt.ttf);
+}
+
+#canvas {
+    margin:0; padding:0;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    background-color: white 10px;
+    
+} 
+
+#mag{
+    font-family: pixelFont;
+    font-size: 20px;
+    width:10%;
+    height:10%;
+    position:absolute;
+    right:10px;
+    bottom:0px;
+}  
+#magCount{
+    right:100%;
+    font-size:larger;
+}
+#mag2{
+    position:absolute;
+    bottom:10px;
+    right:0px
+}
+#magBar{
+    width: 95%;
+    position:static;
+    height: 4px;
+    background-image:linear-gradient(to right,rgb(66, 66, 66) var(--mag),rgba(0, 255, 0, 0) 0%);
+    border-radius: 3px;
+    bottom:5px;
+    border:1px solid black
+}
+#ammoStatus{
+    font-size:x-small;
+    bottom:15px; 
+}
+#health{
+    width:15%;
+    height:10%;
+    font-family: pixelFont;
+    position:absolute;
+    left:10px;
+    bottom:10px;
+}
+#healthCount{
+    position:absolute;
+    left:0px;
+    font-size:larger;
+    bottom:10px
+} 
+#healthBar {
+    width: 70%;
+    position:absolute;
+    height: 4px;
+    background-image:linear-gradient(to right,rgb(0, 128, 0) var(--health),rgba(0, 255, 0, 0) 0%);
+    border-radius: 3px;
+    bottom:5px;
+    border:1px solid black
+}
