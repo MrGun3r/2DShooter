@@ -13,12 +13,23 @@ const enemies = []
 const bullets = []
 const particles = []
 const guns = []
+const items = []
 const worldBorder = {x:1000,y:1000}
 const camera = {x:0,y:0}
 
+var interacted = false
+// CROSSHAIR
+  var crosshairSize = 5
+  var crosshairWidth = 3
+  var crosshairGap = 2
+  var crosshairColor = "green"
+//
 // FPS 
-var fps;
-var fpsLimit = 10
+var fps = 60;
+var fpsMax = 1;
+var fpsLimit = 60
+var elapsedTime = 0;
+var then = performance.now()
 var startTime = performance.now()
 ///------ASSETS-------///////// 
 
@@ -33,10 +44,15 @@ gun.src = "assets/guns.png"
 var muzzleFlash = new Image()
 muzzleFlash.src = "assets/flash.png"
 
+var item = new Image()
+item.src = "assets/items.png"
+
 ///--------------////////
 
 ///-----SOUNDS-------/////
-
+/// NOTE: IN ORDER TO RUN ANY OF THE SOUNDS MAKE SURE TO PUSH TO ARRAY 'noises' ...
+/// ... WITH THE ATTRIBUTE ".cloneNode()"
+/// THE LOOP WILL TAKE CARE DEALING WITH THE SOUND 
 const sounds = {
   machinegun:new Audio("sounds/MachineGun.wav"),
   revolver:  new Audio("sounds/Revolver.wav"),
@@ -50,9 +66,8 @@ const sounds = {
   lowammo:   new Audio('sounds/LowAmmo.wav'),
   pickup:    new Audio('sounds/Pickup.wav'),
   glass:     new Audio('sounds/Glass1.wav'),
-
-  // WALK SOUNDS
-  walk:    new Audio('sounds/walk1.wav')
+  health:    new Audio('sounds/Health.wav'),
+  walk:      new Audio('sounds/walk1.wav')
 }
 
 const noises = []
@@ -61,6 +76,9 @@ sounds.reload.accessKey = "reload"
 sounds.noammo.accessKey = "noammo"
 sounds.walk.accessKey = 'walk'
 //////------------//////////
+
+
+
 class Player{
     constructor(ctx,position){
       this.ctx = ctx 
@@ -76,11 +94,17 @@ class Player{
       // 2 - SHOTGUN
       // 3 - MACHINE GUN
       // 4 - SUBMACHINE GUN
-      this.weapon = 4
+      this.weapon = 3
       this.bullets = {
+        // CURRENT
         light:10,
         heavy:30,
         shells:5,
+        // MAX
+        maxLight: 300,
+        maxHeavy:150,
+        maxShells:30,
+        // VARIABLES
         inAction:0,
         LowAmmo:0
       }
@@ -104,29 +128,30 @@ class Player{
         reloadCancel:false
       }
       if(this.weapon == 1){
-        this.gun.firerate = 500 * fps/60
+        this.gun.firerate = 500 
         
       }
       if(this.weapon == 3){
-        this.gun.firerate = 100 * fps/60
+        this.gun.firerate = 100 
         
       }
       if(this.weapon == 2){
-        this.gun.firerate = 1000 * fps/60
+        this.gun.firerate = 1000
         
       }
       if(this.weapon == 4){
-        this.gun.firerate = 50 * fps/60
+        this.gun.firerate = 50 
       }
       //////////
       this.health = 100
+      this.healthMax = 100
       //////////
       this.knockback = {
         x:0,
         y:0
       }
       this.terminalVelocity = 100 * 1/fps
-      this.frictionCoefficient = 0.8
+      this.frictionCoefficient = 0.8 * 30/fps
       this.acceleration = 30 * 1/fps
       this.size = {height:20,width:20}
       this.angle = 0
@@ -234,6 +259,7 @@ class Player{
       }
     }
     movement(){
+      this.frictionCoefficient = 0.01**(1/fps)
         if (keys.a.pressed && this.velocity.x > -this.terminalVelocity){
          this.velocity.x -= this.acceleration
         }
@@ -253,8 +279,7 @@ class Player{
             this.velocity.y *= this.frictionCoefficient
         }
 
-        if(Math.abs(this.velocity.x) > 1 || Math.abs(this.velocity.y) > 1){
-          
+        if(Math.abs(this.velocity.x) > 1 || Math.abs(this.velocity.y) > 1){      
           if(noises.length > 0){
             for(let i =0;i<noises.length;i++){
               if(noises[i].accessKey == "walk"){
@@ -264,7 +289,7 @@ class Player{
                 if(i >= noises.length - 1){
                   noises.push(sounds.walk.cloneNode())
                 }
-                }
+                } 
               }
           }
           else{
@@ -290,16 +315,16 @@ class Player{
       if(mouse.left.pressed && this.weapon == 0){
         if(this.fist.active){
           this.fist.active = false
-          this.fist.reach = 9
+          this.fist.reach = 9 
         }
       }
       if(!this.fist.active){
         if(this.fist.arm < this.fist.reach && !this.fist.punched){
-          this.fist.arm += 3
-          
+          this.fist.arm += 3 * 30/fps
+          this.fist.arm = Math.round(this.fist.arm)
         }
         else if(this.fist.arm > 0){
-          this.fist.arm -= 1
+          this.fist.arm -= 1 * 30/fps
           this.fist.punched = true
           if(!this.fist.attacked){
             bullets.push(new Bullet(ctx,{x:this.position.x+this.size.width/2,y:this.position.y+this.size.height/2,},this.angle,0,0,0))
@@ -314,6 +339,7 @@ class Player{
           }
         }
         else {this.fist.active = true;
+          this.fist.arm = 0
           this.fist.punched = false; 
           this.fist.hand = !this.fist.hand;
         this.fist.attacked = false}
@@ -357,7 +383,8 @@ class Player{
         this.gun.reloading = false
         this.gun.active = true
           }
-          else{clearTimeout(timer);
+          else{
+            clearTimeout(timer);
             this.gun.reloading = false
           this.gun.reloadCancel = false}
             if(this.weapon == 1 || this.weapon == 4){
@@ -391,19 +418,19 @@ class Player{
     }
     weaponInfo(){
       if(this.weapon == 1){
-        this.gun.firerate = 500 * fps/30
+        this.gun.firerate = 500 
         this.bullets.LowAmmo = 3
       }
       if(this.weapon == 3){
-        this.gun.firerate = 100 * fps/30
+        this.gun.firerate = 100 
         this.bullets.LowAmmo = 5
       }
       if(this.weapon == 2){
-        this.gun.firerate = 1000 * fps/30
+        this.gun.firerate = 1000 
         this.bullets.LowAmmo = 2
       }
       if(this.weapon == 4){
-        this.gun.firerate = 50 * fps/30
+        this.gun.firerate = 50 
         this.bullets.LowAmmo = 5
       }
     }
@@ -445,13 +472,14 @@ class Player{
         }
         else if (!this.gun.loading){
           this.gun.loading = true
-          setTimeout(()=>{
+          var loadTimer = setTimeout(()=>{
             this.gun.active = true
             this.gun.loading = false
           },this.gun.firerate)
         }
         else {
-          this.gun.fire = false}
+          this.gun.fire = false
+        }
         }
         else {
           this.gun.fire = false;
@@ -531,7 +559,7 @@ class Player{
             this.ctx.beginPath()
             this.ctx.rect(this.size.width+10,this.size.height/2-0.5,5,3)
             if(this.gun.fire){
-              this.ctx.drawImage(muzzleFlash,this.size.width+15,0,30,20)
+              this.ctx.drawImage(muzzleFlash,this.size.width+15,5,15,10)
             }
             this.ctx.fillStyle = "#303030"
             this.ctx.fill()
@@ -546,7 +574,7 @@ class Player{
             this.ctx.beginPath()
             this.ctx.rect(this.size.width+6,this.size.height/2-0.5,4,2)
             if(this.gun.fire){
-              this.ctx.drawImage(muzzleFlash,this.size.width+10,5,15,10)
+              this.ctx.drawImage(muzzleFlash,this.size.width+15,5,15,10)
             }
             this.ctx.fill()
             this.ctx.stroke()
@@ -569,7 +597,7 @@ class Player{
     }
     throw(){
       if(keys.e.pressed && this.weapon > 0 && this.pickupbool){
-        guns.push(new Gun(ctx,{x:this.position.x,y:this.position.y},{x:10*Math.cos(this.angle),y:10*Math.sin(this.angle)},this.weapon,this.mag))
+        guns.push(new Gun(ctx,{x:this.position.x,y:this.position.y},{x:10*Math.cos(this.angle),y:10*Math.sin(this.angle)},this.weapon,this.mag,this.gun.active))
         this.weapon = 0
         this.mag = 0
         this.pickupbool = false
@@ -598,6 +626,7 @@ class Player{
            this.weapon = gun.type
            noises.push(sounds.pickup.cloneNode())
            this.mag = gun.mag
+           this.gun.active = gun.active
            this.pickupbool = false
         }
       })
@@ -606,16 +635,17 @@ class Player{
       this.position.x += this.velocity.x + this.knockback.x
       this.position.y += this.velocity.y + this.knockback.y
       if(Math.abs(this.knockback.x) > 0.1){
-        this.knockback.x *= 0.8
+        this.knockback.x *= 0.7
       }
       else {this.knockback.x = 0}
       if (Math.abs(this.knockback.y) > 0.1){
-        this.knockback.y *= 0.8
+        this.knockback.y *= 0.7
       }
       else {this.knockback.y = 0}
 
-      this.terminalVelocity = 100 * 1/fps
-      this.acceleration = 30 * 1/fps
+      this.terminalVelocity = 4 * 30/fps
+      this.acceleration = 1 * 30/fps
+  
     }
 }
 
@@ -741,7 +771,7 @@ class Bullet {
      this.gotPast1 = []
      this.inaccuracyRange = 40
      this.angle = angle + (2*Math.random()-1)*inaccuracy / this.inaccuracyRange
-     this.speed = 50
+     this.speed = 50 * 30/fps
      this.type = type
      this.maxTravelDistance = 1000
      if(this.type == 0){
@@ -905,6 +935,7 @@ class Bullet {
      if (this.travelDistance > this.maxTravelDistance){
       bullets.splice(bullets.indexOf(this),1)
      }
+     this.speed = 50 * 30/fps
   }
 
 }
@@ -915,7 +946,7 @@ class Enemy{
       this.position = position
       this.velocity = {x:0,y:0}
       this.size = {width:20,height:20}
-      this.speed = 100 * 1/fps
+      this.speed = 4 * 30/fps
       this.angle = 0
       this.idle = {
         bool:true,
@@ -957,19 +988,16 @@ class Enemy{
         reactionTime:300
       }
       if(this.weapon == 1){
-        this.gun.firerate = 500 * fps/60
-        
+        this.gun.firerate = 500  
       }
       if(this.weapon == 3){
-        this.gun.firerate = 100 * fps/60
-        
+        this.gun.firerate = 100        
       }
       if(this.weapon == 2){
-        this.gun.firerate = 1000 * fps/60
-        
+        this.gun.firerate = 10000      
       }
       if(this.weapon == 4){
-        this.gun.firerate = 50 * fps/60
+        this.gun.firerate = 50 
       }
       this.health = 50
       this.knockback = {
@@ -1152,19 +1180,19 @@ class Enemy{
     }
     weaponInfo(){
       if(this.weapon == 1){
-        this.gun.firerate = 500 * fps/30
+        this.gun.firerate = 500 
         this.gun.attackrange = 200
        }
        if(this.weapon == 3){
-        this.gun.firerate = 100* fps/30
+        this.gun.firerate = 100
         this.gun.attackrange = 150
        }
        if(this.weapon == 2){
-        this.gun.firerate = 1000* fps/30
+        this.gun.firerate = 1000
         this.gun.attackrange = 50
        }
        if(this.weapon == 4){
-        this.gun.firerate = 50* fps/30
+        this.gun.firerate = 50
         this.gun.attackrange = 100
        }
     }
@@ -1180,10 +1208,10 @@ class Enemy{
           
           if(!this.fist.active){
             if(this.fist.arm < this.fist.reach && !this.fist.punched){
-              this.fist.arm += 3    
+              this.fist.arm += 3  * 30/fps  
             }
             else if(this.fist.arm > 0){
-              this.fist.arm -= 1
+              this.fist.arm -= 1* 30/fps
               this.fist.punched = true
               if(distance < 40 && !this.fist.attacked){
                 player.hurt(10,this.angle)
@@ -1284,14 +1312,14 @@ class Enemy{
       if (this.idle.bool && !this.idle.active && !this.aware && !this.alerted){
         
       this.idle.active = true
-      this.speed = 25 * 1/fps
+      this.speed = 30 * 1/fps
       var interval = setInterval(()=>{
        if(this.idle.bool){
         this.angle = 2*Math.PI*Math.random() - Math.PI
           if (Math.random()<0.3){
             this.speed = 0
           }
-          else {this.speed = 25 * 1 /fps}
+          else {this.speed = 30 * 1 /fps}
        }
        else {clearInterval(interval)}
        
@@ -1307,7 +1335,7 @@ class Enemy{
       else {
           if(!this.trajectory.fail && this.trajectory.path.length != 0 && this.inBounds){
           this.pathFind()
-          this.speed = 3
+          this.speed = 3 * 30/fps
         }
         else {
           this.alerted = false
@@ -1334,6 +1362,8 @@ class Enemy{
         this.knockback.y *= 0.9
       }
       else {this.knockback.y = 0}
+      this.speed = 3 * 30/fps
+      
      }
     hurt(damage,angle){
       this.health -= damage
@@ -1346,8 +1376,8 @@ class Enemy{
     death(){
         for(let i = 0;i<5;i++){
           particles.push(new Particle(ctx,{x:this.position.x,y:this.position.y},1,1))
-          noises.push(sounds.glass.cloneNode())
         }
+        noises.push(sounds.glass.cloneNode())
         if(this.weapon > 0){
           this.drop()
         }
@@ -1355,8 +1385,11 @@ class Enemy{
         enemies.splice(enemies.indexOf(this),1)
      }
      drop(){
-      guns.push(new Gun(ctx,this.position,{x:5*Math.cos(this.angle),y:5*Math.sin(this.angle)},this.weapon,this.mag))
-     }
+      guns.push(new Gun(ctx,{x:this.position.x,y:this.position.y},{x:5*Math.cos(this.angle),y:5*Math.sin(this.angle)},this.weapon,this.mag))
+      if(Math.random() > 0.7){
+        items.push(new Item(ctx,{x:this.position.x,y:this.position.y},{x:3*Math.cos(this.angle),y:3*Math.sin(this.angle)},this.weapon))
+      }
+    }
      // PATHFINDING - DONT CHANGE 
     pathFind(){
     
@@ -1495,7 +1528,7 @@ class Enemy{
 }
 
 class Gun{
-  constructor(ctx,position,velocity,type,mag){
+  constructor(ctx,position,velocity,type,mag,active){
    this.ctx = ctx
    this.mag = mag
    this.position = position
@@ -1510,6 +1543,10 @@ class Gun{
     {width:35,height:30},// SMG 
    ]
    this.size = this.sizes[this.type-1]
+   if(active){
+    this.active = active
+   }
+   else {this.active = true}
   }
   init(){
     this.update()
@@ -1554,27 +1591,139 @@ class Gun{
     this.velocity.y *= 0.8
   }
 }
-
-function gameLoop(){
-    // FPS COMPUTE  
-    var elapsedTime = performance.now() - startTime;
-    fps = Math.round(1000 / elapsedTime)
-    startTime = performance.now();
+class Item{
+  constructor(ctx,position,velocity,item){
+    this.ctx = ctx 
+    this.position = position
+    this.velocity = velocity
+    this.angle = Math.random()
+    this.rotation = 1
+    this.item = item
+    if(this.item == 4){
+      this.item = 3
+    }
+    if (this.item == 0){
+      this.value = 20
+    }
+    if(this.item == 1){
+      this.value = 30
+    }
+    if(this.item == 2){
+      this.value = 5
+    }
+    if(this.item == 3){
+      this.value = 20
+    }
+    this.value;
+    this.sizes = [
+      {width:15,height:15},
+      {width:15,height:20},
+      {width:20,height:14},
+      {width:25,height:17}
+    ]
+    this.size = this.sizes[this.item]
+    // 0 HEALTH
+    // 1 LIGHT
+    // 2 SHELLS
+    // 3 HEAVY 
+  }
+  init(){
+    this.draw()
+    this.update()
+    this.collision()
+  }
+  draw(){
+    this.ctx.save()
     
+    this.ctx.translate(this.position.x+this.size.width/2,this.position.y+this.size.height/2)
+    
+    this.ctx.rotate(this.angle)
+    this.ctx.translate(-this.size.width/2,-this.size.height/2)
+    if (this.item == 0){
+      this.ctx.drawImage(item,23,31,23,18,0,0,this.size.width,this.size.height)
+    }
+    if(this.item == 1){
+      this.ctx.drawImage(item,0,38,9,11,0,0,this.size.width,this.size.height)
+    }
+    if(this.item == 2){
+      this.ctx.drawImage(item,0,29,16,7,0,0,this.size.width,this.size.height)
+    }
+    if(this.item == 3){
+      this.ctx.drawImage(item,0,0,46,27,0,0,this.size.width,this.size.height)
+    }
+    this.ctx.restore()
+  }
+  collision(){
+    players.forEach((player)=>{
+      if(Collision(player,this)){
+        if(this.item == 0 && player.health < player.healthMax){
+          player.health += this.value
+          noises.push(sounds.health.cloneNode())
+          if(player.health > player.healthMax){
+            player.health = player.healthMax
+          }
+          items.splice(items.indexOf(this),1)
+        }
+        if(this.item == 1 && player.bullets.light < player.bullets.maxLight){
+          player.bullets.light += this.value
+          noises.push(sounds.pickup.cloneNode())
+          if(player.bullets.light > player.bullets.maxLight){
+            player.bullets.light = player.bullets.maxLight
+          }
+          items.splice(items.indexOf(this),1)
+        }
+        if(this.item == 2 && player.bullets.shells < player.bullets.maxShells){
+          player.bullets.shells += this.value
+          noises.push(sounds.pickup.cloneNode())
+          if(player.bullets.shells > player.bullets.maxShells){
+            player.bullets.shells = player.bullets.maxShells
+          }
+          items.splice(items.indexOf(this),1)
+        }
+        if(this.item == 3 && player.bullets.heavy < player.bullets.maxHeavy){
+          player.bullets.heavy += this.value
+          noises.push(sounds.pickup.cloneNode())
+          if(player.bullets.heavy > player.bullets.maxHeavy){
+            player.bullets.heavy = player.bullets.maxHeavy
+          }
+          items.splice(items.indexOf(this),1)
+        }
+        
+        
+      }
+    })
+    
+  }
+  update(){
+    this.position.x += this.velocity.x
+    this.position.y += this.velocity.y
+     this.velocity.x *= 0.7
+     this.velocity.y *= 0.7
+    this.angle += this.rotation
+    this.rotation *= 0.8
+  }
+}
+function draw(){    
     // AUDIO
     noises.forEach((noise,index)=>{
       if(Math.round(noise.duration*10) <= Math.round(noise.currentTime*10)){
         noises.splice(index,1)
         
       }
-      if(noise.currentTime == 0){
-        noise.play()
+      if(noise.currentTime == 0 ){
+        if(document.hasFocus() && interacted){
+           noise.play()          
+        }
+        else {
+          noises.splice(index,1)
+        }
+       
       }
     })
 
     // MOUSE 
     mouse.pos.y = mouse.event.y*canvas.height/rect.bottom + camera.y
-    mouse.pos.x = mouse.event.x*canvas.width/rect.right + camera.x
+    mouse.pos.x = mouse.event.x*canvas.width/rect.right   + camera.x
     ctx.save()
     // CAMERA
     ctx.translate(-camera.x,-camera.y)
@@ -1589,8 +1738,10 @@ function gameLoop(){
       }
       
     }
-
     ctx.globalAlpha = 1
+    items.forEach((item)=>{
+    item.init()
+    })
     guns.forEach((gun)=>{
       gun.init()
     })
@@ -1601,7 +1752,7 @@ function gameLoop(){
     particles.forEach((particle)=>{
       particle.init()
     })
-
+    
     players.forEach((player)=>{
        player.init()
       // PLAYER DETECTION AND SUCH
@@ -1645,18 +1796,15 @@ function gameLoop(){
     obstacles.forEach((obstacle)=>{
       obstacle.init()
     })
-    
     enemies.forEach((enemy)=>{
       enemy.init()
-     enemies.forEach((enemy2)=>{
+      enemies.forEach((enemy2)=>{
       if(Collision(enemy,enemy2) && enemy != enemy2){
         CollisionCorrection(enemy,enemy2)
       }
      })
     })
     ctx.restore()
-    window.onresize = resize
-    requestAnimationFrame(gameLoop)
 }
 
 function lineRect(player,obstacle,enemy,bool){
@@ -1779,6 +1927,9 @@ addEventListener('mousedown',(event)=>{
   if (event.button == 2){
     mouse.right.pressed = true
   }
+  if(!interacted){
+    interacted = true
+  }
  })
 addEventListener('mouseup',(event)=>{
     if (event.button == 0){
@@ -1793,8 +1944,63 @@ addEventListener('mousemove',(event)=>{
   })
 
 // GAME START 
+function gameLoop(){
+  
+  // FPS COMPUTE  
+  elapsedTime = performance.now() - then
+  if(elapsedTime > 1/fpsLimit * 1000){
+    {
+      let elapsedTime = performance.now() - startTime;
+      fps = Math.round(1000 / elapsedTime)
+      startTime = performance.now();
+      if(fps > fpsLimit){
+        fps = fpsLimit
+      }
+      }
+      if (fps > fpsMax){
+        fpsMax = fps
+      }
+      if(fpsMax > fpsLimit){
+        fpsMax = fpsLimit
+      }
+    draw() 
+    then = performance.now()
 
+
+     /// HUD --------------------------------------
+    // CROSSHAIR
+  { ctx.save()
+    ctx.beginPath()
+    ctx.lineWidth = crosshairWidth
+    ctx.strokeStyle = crosshairColor
+    ctx.translate(mouse.event.x*canvas.width/rect.right,mouse.event.y*canvas.height/rect.bottom)
+  
+    ctx.moveTo(crosshairGap,0)
+    ctx.lineTo(crosshairGap + crosshairSize,0)
+  
+    ctx.moveTo(-crosshairGap,0)
+    ctx.lineTo(-crosshairSize - crosshairGap,0)
+    
+    ctx.moveTo(0,crosshairGap)
+    ctx.lineTo(0,crosshairSize + crosshairGap)
+  
+    ctx.moveTo(0,-crosshairGap)
+    ctx.lineTo(0,-crosshairSize - crosshairGap)
+  
+    ctx.stroke()
+  
+    ctx.closePath()
+    ctx.restore()
+    }
+    window.onresize = resize
+    /// HUD --------------------------------------
+  }
+    
+  
+  requestAnimationFrame(gameLoop)
+}
 gameLoop()
+
 players.push(new Player(ctx,{x:100,y:500}))
 obstacles.push(new Obstacle(ctx,{x:600,y:200},{width:200,height:150}))
 obstacles.push(new Obstacle(ctx,{x:250,y:250},{width:100,height:100}))
@@ -1807,20 +2013,23 @@ obstacles.push(new Obstacle(ctx,{x:2600,y:900},{width:100,height:100}))
 obstacles.push(new Obstacle(ctx,{x:1000,y:500},{width:10,height:100}))
 obstacles.push(new Obstacle(ctx,{x:2500,y:800},{width:50,height:100}))
 
-guns.push(new Gun(ctx,{x:100,y:50},{x:0,y:0},2,5))
-guns.push(new Gun(ctx,{x:100,y:50},{x:0,y:0},1,5))
-guns.push(new Gun(ctx,{x:50,y:50},{x:0,y:0},4,25))
-guns.push(new Gun(ctx,{x:50,y:50},{x:0,y:0},3,25))
+items.push(new Item(ctx,{x:60,y:60},{x:0,y:0},0,0))
+//guns.push(new Gun(ctx,{x:100,y:50},{x:0,y:0},2,5))
+//guns.push(new Gun(ctx,{x:100,y:50},{x:0,y:0},1,5))
+//guns.push(new Gun(ctx,{x:50,y:50},{x:0,y:0},4,25))
+//guns.push(new Gun(ctx,{x:50,y:50},{x:0,y:0},3,25))
 guns.push(new Gun(ctx,{x:50,y:50},{x:0,y:0},2,25))
-
+//
 document.querySelector(':root').style.setProperty('--window',Math.sqrt(innerHeight**2+innerWidth**2)/50+"px")
 
-enemies.push(new Enemy(ctx,{x:600,y:500},1))
-//enemies.push(new Enemy(ctx,{x:500,y:500},2))
-//enemies.push(new Enemy(ctx,{x:500,y:900},3))
-//enemies.push(new Enemy(ctx,{x:500,y:900},4))
-//enemies.push(new Enemy(ctx,{x:500,y:500},0))
-//enemies.push(new Enemy(ctx,{x:200,y:700},1))
-//enemies.push(new Enemy(ctx,{x:500,y:700},0))
-//enemies.push(new Enemy(ctx,{x:400,y:500},0))
+enemies.push(new Enemy(ctx,{x:600,y:400},1))
+enemies.push(new Enemy(ctx,{x:500,y:500},2))
+enemies.push(new Enemy(ctx,{x:500,y:900},3))
+enemies.push(new Enemy(ctx,{x:500,y:900},4))
+enemies.push(new Enemy(ctx,{x:500,y:500},0))
+enemies.push(new Enemy(ctx,{x:200,y:700},1))
+enemies.push(new Enemy(ctx,{x:500,y:700},0))
+enemies.push(new Enemy(ctx,{x:400,y:500},0))
+
+
 

@@ -3,6 +3,7 @@
     --mag:0;
     --window:0
 }
+
 *{
     margin:0; padding:0;
     overflow: hidden;
@@ -11,7 +12,9 @@
     -ms-user-select: none; /* IE 10 and IE 11 */
     user-select: none; /* Standard syntax */
     font-size: var(--window);
+    cursor:none;
 }
+
 @font-face {
     font-family: pixelFont;
     src: url(font/upheavtt.ttf);
