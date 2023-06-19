@@ -14,12 +14,17 @@ const bullets = []
 const particles = []
 const guns = []
 const items = []
-const worldBorder = {x:1000,y:1000}
+var mapLoading = false
+var mapOpacity = 0
+const worldBorder = {x:Math.random()*1000,y:Math.random()*1000}
+worldBorder.x -= worldBorder.x%50
+worldBorder.y -= worldBorder.y%50
 const camera = {x:0,y:0}
 
 var interacted = false
+
 // CROSSHAIR
-  var crosshairSize = 5
+  var crosshairSize = 10
   var crosshairWidth = 3
   var crosshairGap = 2
   var crosshairColor = "green"
@@ -27,14 +32,14 @@ var interacted = false
 // FPS 
 var fps = 60;
 var fpsMax = 1;
-var fpsLimit = 60
+var fpsLimit = 100000
 var elapsedTime = 0;
 var then = performance.now()
 var startTime = performance.now()
 ///------ASSETS-------///////// 
 
-var background = new Image()
-background.src = "assets/background.jpg" 
+var floor = new Image()
+floor.src = "assets/background.jpg" 
 var wall = new Image()
 wall.src = "assets/Wall.png"
 var bullet = new Image()
@@ -218,6 +223,14 @@ class Player{
       }
       if(this.weapon == 4){
         document.querySelector(':root').style.setProperty('--mag',this.mag*3.333+"%")
+      }
+
+      
+      if(enemies.length <= 0){
+        document.getElementById('enemiesText').innerHTML = "Exit room"
+      }
+      else {
+        document.getElementById('enemiesText').innerHTML = enemies.length+' left'
       }
     }
     rotate(){
@@ -505,7 +518,7 @@ class Player{
       this.ctx.save()
       this.ctx.lineWidth = 2
 
-      this.ctx.translate(this.position.x+this.size.width/2,this.position.y+this.size.height/4)
+      this.ctx.translate(this.position.x+this.size.width/2,this.position.y+this.size.height/2)
       this.ctx.rotate(this.angle)
       this.ctx.translate(-this.size.width/2,-this.size.height/2)
       // AVOID FUTURE PROBLEMS
@@ -654,7 +667,7 @@ class Obstacle{
     this.ctx = ctx
     this.position = position
     this.size = size
-    
+   
   }
   init(){
     this.update()
@@ -665,19 +678,20 @@ class Obstacle{
     this.ctx.fillStyle = "#80552a"
     this.ctx.strokeStyle = "#38230f"
     this.ctx.lineWidth = 4
-    this.ctx.roundRect(this.position.x,this.position.y,this.size.width,this.size.height,[5,5,5,5])
+    this.ctx.roundRect(this.position.x,this.position.y,this.size.width,this.size.height,[0,0,0,0])
+    
     this.ctx.fill()
     this.ctx.clip()
-    this.ctx.globalAlpha = 0.5
+    this.ctx.globalAlpha = 0.4
     for (let i = 0;i<this.size.width;i += 300){
       for (let j = 0 ;j<this.size.height;j += 300){
       this.ctx.drawImage(wall,this.position.x+i,this.position.y+j,300,300)}
     }
-    
     this.ctx.globalAlpha = 1
-    this.ctx.stroke()
+    this.ctx.closePath()
     this.ctx.restore()
   }
+  
   update(){
     this.draw()
   }
@@ -771,7 +785,7 @@ class Bullet {
      this.gotPast1 = []
      this.inaccuracyRange = 40
      this.angle = angle + (2*Math.random()-1)*inaccuracy / this.inaccuracyRange
-     this.speed = 50 * 30/fps
+     this.speed = 70 * 30/fps
      this.type = type
      this.maxTravelDistance = 1000
      if(this.type == 0){
@@ -780,7 +794,7 @@ class Bullet {
         height:30
        }
       this.maxTravelDistance = 30
-      this.speed = 10
+      this.speed = 10 * 30/fps
       this.damage = 10
      }
      if(this.type == 1 || this.type == 4){
@@ -829,16 +843,20 @@ class Bullet {
   draw(){
 
     if(this.type > 0){
-      if (!this.collided.bool){
-    this.ctx.save()    
-    
+      if (!this.collided.bool){   
+    this.ctx.save() 
+    this.ctx.beginPath()
+    //this.ctx.rect(this.position.x,this.position.y,this.size.height,this.size.width)
+    //this.ctx.strokeStyle = 'white'
+    //this.ctx.stroke()
     for(let i = 0;i<10;i++){
-    this.ctx.translate(this.position.x-2*i*Math.cos(this.angle),this.position.y-2*i*Math.sin(this.angle))
+    this.ctx.translate(this.position.x-2*i*Math.cos(this.angle)+this.size.width/2,this.position.y-2*i*Math.sin(this.angle)
+    +this.size.height/2)
     this.ctx.rotate(this.angle+3*Math.PI/2)
     this.ctx.globalAlpha = 1 -i*0.1
     this.ctx.drawImage(bullet,0,0,this.size.width,this.size.height)
     this.ctx.rotate(-this.angle-3*Math.PI/2)
-    this.ctx.translate(-this.position.x+2*i*Math.cos(this.angle),-this.position.y+2*i*Math.sin(this.angle))}
+    this.ctx.translate(-this.position.x+2*i*Math.cos(this.angle)-this.size.width/2,-this.position.y+2*i*Math.sin(this.angle)-this.size.height/2)}
     this.ctx.restore()}
     else {
       this.delete(this.collided.type)}
@@ -850,11 +868,11 @@ class Bullet {
     if(this.type > 0){
     obstacles.forEach((obstacle)=>{
      if (lineRect({
-        position:{x:this.originPos.x,y:this.originPos.y},size:this.size},obstacle,this,false) && 
+        position:{x:this.originPos.x,y:this.originPos.y},size:this.size},obstacle,this,false,0) && 
         lineRect({
-          position:{x:this.originPos.x,y:this.originPos.y},size:this.size},obstacle,this,true) != undefined){
+          position:{x:this.originPos.x,y:this.originPos.y},size:this.size},obstacle,this,true,0) != undefined){
           this.position = lineRect({
-            position:{x:this.originPos.x,y:this.originPos.y},size:this.size},obstacle,this,true)
+            position:{x:this.originPos.x,y:this.originPos.y},size:this.size},obstacle,this,true,0)
           this.collided.bool = true;
           this.collided.type = 0
       }
@@ -880,11 +898,11 @@ class Bullet {
         if(this.type > 0){
           
       if (lineRect({
-        position:{x:this.originPos.x,y:this.originPos.y},size:this.size},enemy,this,false) && 
+        position:{x:this.originPos.x,y:this.originPos.y},size:this.size},enemy,this,false,0) && 
         lineRect({
-          position:{x:this.originPos.x,y:this.originPos.y},size:this.size},enemy,this,true) != undefined && !this.gotPast.includes(index)){
+          position:{x:this.originPos.x,y:this.originPos.y},size:this.size},enemy,this,true,0) != undefined && !this.gotPast.includes(index)){
           this.position = lineRect({
-            position:{x:this.originPos.x,y:this.originPos.y},size:this.size},enemy,this,true)
+            position:{x:this.originPos.x,y:this.originPos.y},size:this.size},enemy,this,true,0)
           this.collided.bool = true;
           this.collided.type = 1
           enemy.hurt(this.damage,this.angle)}
@@ -906,11 +924,11 @@ class Bullet {
     if(this.emitter == 1){
       players.forEach((player,index)=>{
         if (lineRect({
-          position:{x:this.originPos.x,y:this.originPos.y},size:this.size},player,this,false) && 
+          position:{x:this.originPos.x,y:this.originPos.y},size:this.size},player,this,false,0) && 
           lineRect({
-            position:{x:this.originPos.x,y:this.originPos.y},size:this.size},player,this,true) != undefined && !this.gotPast1.includes(index)){
+            position:{x:this.originPos.x,y:this.originPos.y},size:this.size},player,this,true,0) != undefined && !this.gotPast1.includes(index)){
             this.position = lineRect({
-              position:{x:this.originPos.x,y:this.originPos.y},size:this.size},player,this,true)
+              position:{x:this.originPos.x,y:this.originPos.y},size:this.size},player,this,true,0)
             this.collided.bool = true;
             this.collided.type = 1
             player.hurt(this.damage,this.angle)
@@ -935,7 +953,7 @@ class Bullet {
      if (this.travelDistance > this.maxTravelDistance){
       bullets.splice(bullets.indexOf(this),1)
      }
-     this.speed = 50 * 30/fps
+     this.speed = 70 * 30/fps
   }
 
 }
@@ -985,7 +1003,7 @@ class Enemy{
         fire:false,
         fired:false,
         ready:false,
-        reactionTime:300
+        reactionTime:1000
       }
       if(this.weapon == 1){
         this.gun.firerate = 500  
@@ -1003,6 +1021,7 @@ class Enemy{
       this.knockback = {
         x:0,y:0
       }
+      
       this.aware = false
       this.alerted = false  
 
@@ -1012,7 +1031,7 @@ class Enemy{
         index:0,
         bool:false,
         fail:false, 
-
+        attempt:0
       }
       this.findingPath = false
       this.inBounds = true
@@ -1362,7 +1381,10 @@ class Enemy{
         this.knockback.y *= 0.9
       }
       else {this.knockback.y = 0}
-      this.speed = 3 * 30/fps
+      if(this.aware){
+        this.speed = 3 * 30/fps
+      }
+      
       
      }
     hurt(damage,angle){
@@ -1386,7 +1408,7 @@ class Enemy{
      }
      drop(){
       guns.push(new Gun(ctx,{x:this.position.x,y:this.position.y},{x:5*Math.cos(this.angle),y:5*Math.sin(this.angle)},this.weapon,this.mag))
-      if(Math.random() > 0.7){
+      if(Math.random() > 0){
         items.push(new Item(ctx,{x:this.position.x,y:this.position.y},{x:3*Math.cos(this.angle),y:3*Math.sin(this.angle)},this.weapon))
       }
     }
@@ -1490,7 +1512,11 @@ class Enemy{
       }
       current = openSet[best];
     
-      if (current == target){
+      if ((current == target ||  k == pathDistance - 1) && this.trajectory.attempt < 5){
+        if(k == pathDistance - 1){
+          this.trajectory.attempt++
+        }
+        else{this.trajectory.attempt = 0}
        for (let l = 0;l<pathDistance;l++){
         path.push({x:current.i*cols + cols / 2 + camera.x - camera.x%cols,y:current.j*rows + rows / 2 + camera.y - camera.y%rows,width:cols,height:rows})
         current = current.previous
@@ -1501,12 +1527,12 @@ class Enemy{
           enemy.trajectory.fail = false 
           return 0;
         }
-        
        }
       }
-      else if ( k == pathDistance - 1){
-        enemy.trajectory.fail = true
-        return 0;
+      if(this.trajectory.attempt >= 5){
+        this.alerted = false
+        this.idle.bool = true
+        this.idle.active = false
       }
       closedSet.push(current)
       
@@ -1562,8 +1588,8 @@ class Gun{
   }
   draw(){
     this.ctx.save()
-    //this.ctx.rect(this.position.x,this.position.y,this.size.width,this.size.height)
-    //this.ctx.stroke()
+    this.ctx.rect(this.position.x,this.position.y,this.size.width,this.size.height)
+    this.ctx.stroke()
     this.ctx.translate(this.position.x+this.size.width/2,this.position.y+this.size.height/2)
     this.ctx.rotate(this.angle)
     this.ctx.translate(-this.size.width/2,-this.size.height/2)
@@ -1703,7 +1729,7 @@ class Item{
     this.rotation *= 0.8
   }
 }
-function draw(){    
+function draw(){   
     // AUDIO
     noises.forEach((noise,index)=>{
       if(Math.round(noise.duration*10) <= Math.round(noise.currentTime*10)){
@@ -1717,7 +1743,6 @@ function draw(){
         else {
           noises.splice(index,1)
         }
-       
       }
     })
 
@@ -1726,26 +1751,30 @@ function draw(){
     mouse.pos.x = mouse.event.x*canvas.width/rect.right   + camera.x
     ctx.save()
     // CAMERA
+    {
     ctx.translate(-camera.x,-camera.y)
-    ctx.fillStyle = '#c49b72'
+    }
+    ctx.fillStyle = 'black'
     ctx.fillRect(0,0,canvas.width+camera.x,canvas.height+camera.y)
     ctx.fillStyle = 'white'
-    // TILING
+    
+    
+   
+     //TILING
     ctx.globalAlpha = 0.5
     for (let i = 0;i<canvas.width+camera.x;i+= 100){
       for ( let j = 0;j <canvas.height+camera.y;j+= 100){
-        ctx.drawImage(background,i,j,100,100)
+        ctx.drawImage(floor,i,j,100,100)
       }
-      
     }
     ctx.globalAlpha = 1
+
     items.forEach((item)=>{
     item.init()
     })
     guns.forEach((gun)=>{
       gun.init()
     })
-
     bullets.forEach((bullet)=>{
       bullet.init()
     })
@@ -1754,6 +1783,15 @@ function draw(){
     })
     
     players.forEach((player)=>{
+      if(enemies.length <= 0){
+        mapLoading = true
+      }
+      if(enemies.length <= 0 && mapLoading &&(player.position.x-player.position.x%50 == 0 && (player.position.y+ 50)-(player.position.y%50)  == (canvas.height+worldBorder.y)/2 -((canvas.height+worldBorder.y)/2)%50)){
+        obstacles.length = 0
+        items.length = 0
+        generateMap()
+        mapLoading = false
+       }
        player.init()
       // PLAYER DETECTION AND SUCH
       enemies.forEach((enemy)=>{
@@ -1762,7 +1800,7 @@ function draw(){
         }
         if(enemy.inBounds){
           for (let i=0;i < obstacles.length;i++){
-            if (lineRect(player,obstacles[i],enemy,false)){
+            if (lineRect(player,obstacles[i],enemy,false,1) && lineRect(player,obstacles[i],enemy,false,2)){
               enemy.aware = false
               if(!enemy.alerted){
                 enemy.idle.bool = true
@@ -1772,6 +1810,7 @@ function draw(){
             if (i == obstacles.length - 1 ){
               enemy.aware = true
               enemy.alerted = true
+              enemy.trajectory.attempt = 0
             }
           }
           if (enemy.aware){
@@ -1804,19 +1843,76 @@ function draw(){
       }
      })
     })
+    camera.x = (Math.abs(camera.x)+camera.x)/2
+    camera.y = (Math.abs(camera.y)+camera.y)/2
+   //if(mapLoading){
+   //  this.ctx.fillStyle = "black"
+   //  this.ctx.globalAlpha = mapOpacity
+   //  this.ctx.fillRect(camera.x,camera.y,canvas.width+camera.x,canvas.width+camera.y)
+   //  mapOpacity += 0.5 * 30/fps
+   //  if(mapOpacity >= 1){
+   //    mapOpacity -= 0.5 * 30/fps
+   //  }
+   //}
     ctx.restore()
+
+    /// HUD --------------------------------------
+    
+  { // CROSSHAIR
+    ctx.save()
+    ctx.beginPath()
+    ctx.lineWidth = crosshairWidth
+    ctx.strokeStyle = crosshairColor
+    ctx.translate(mouse.event.x*canvas.width/rect.right,mouse.event.y*canvas.height/rect.bottom)
+  
+    ctx.moveTo(crosshairGap,0)
+    ctx.lineTo(crosshairGap + crosshairSize,0)
+  
+    ctx.moveTo(-crosshairGap,0)
+    ctx.lineTo(-crosshairSize - crosshairGap,0)
+    
+    ctx.moveTo(0,crosshairGap)
+    ctx.lineTo(0,crosshairSize + crosshairGap)
+  
+    ctx.moveTo(0,-crosshairGap)
+    ctx.lineTo(0,-crosshairSize - crosshairGap)
+  
+    ctx.stroke()
+  
+    ctx.closePath()
+    ctx.restore()
+    }
+    window.onresize = resize
+    /// HUD --------------------------------------
 }
 
-function lineRect(player,obstacle,enemy,bool){
+function lineRect(player,obstacle,enemy,bool,side){
   // (x1,y1) (x2,y2) BEING THE VISION LINE 
   // (x3,y3) LINE OF THE RECT  // x4 && y4 NOT NEEDED
+  if(side == 0){
   x1 = enemy.position.x+enemy.size.width/2
   y1 = enemy.position.y+enemy.size.height/2
   x2 = player.position.x+player.size.width/2
   y2 = player.position.y+player.size.height/2
   x3 = obstacle.position.x
   y3 = obstacle.position.y
-
+  }
+  if(side == 1){
+  x1 = enemy.position.x+enemy.size.width/2
+  y1 = enemy.position.y  
+  x2 = player.position.x+player.size.width/2
+  y2 = player.position.y+player.size.height/2
+  x3 = obstacle.position.x
+  y3 = obstacle.position.y
+  }
+  if(side == 2){
+  x1 = enemy.position.x+enemy.size.width
+  y1 = enemy.position.y+enemy.size.height
+  x2 = player.position.x+player.size.width/2
+  y2 = player.position.y+player.size.height/2
+  x3 = obstacle.position.x
+  y3 = obstacle.position.y
+  }
   let top = LineCollision(x1,y1,x2,y2,x3,y3,x3+obstacle.size.width,y3,bool) // TOP
   let left = LineCollision(x1,y1,x2,y2,x3,y3,x3,y3+obstacle.size.height,bool) // LEFT
   let right  = LineCollision(x1,y1,x2,y2,x3+obstacle.size.width,y3,x3+obstacle.size.width,y3+obstacle.size.height,bool) // RIGHT
@@ -1877,28 +1973,27 @@ function Collision(player,obstacle){
   }
 
 function CollisionCorrection(player,obstacle){
-  if(
-    player.position.x+player.size.width > obstacle.position.x &&(obstacle.position.x+obstacle.size.width) > player.position.x&&player.position.y+player.size.height > obstacle.position.y&&obstacle.position.y+obstacle.size.height > player.position.y){
+  
     if (Math.min(Math.abs(player.position.x+player.size.width-obstacle.position.x),Math.abs(player.position.x-obstacle.position.x-obstacle.size.width))
-      <Math.min(Math.abs(player.position.y+player.size.height-obstacle.position.y),Math.abs(player.position.y-obstacle.position.y-obstacle.size.height) 
-    )){
-      if (Math.abs(player.position.x + player.size.width - obstacle.position.x)>Math.abs(player.position.x - obstacle.position.x - obstacle.size.width)){
-      player.position.x = obstacle.position.x + obstacle.size.width
-      player.velocity.x = 0
-     }
-     else {player.position.x = obstacle.position.x - player.size.width;
-      player.velocity.x = 0}
-    }
-    else {
+      >Math.min(Math.abs(player.position.y+player.size.height-obstacle.position.y),Math.abs(player.position.y-obstacle.position.y-obstacle.size.height) 
+    ))
+    {
       if (Math.abs(player.position.y + player.size.height - obstacle.position.y)>Math.abs(player.position.y - obstacle.position.y - obstacle.size.height)){
         player.position.y = obstacle.position.y + obstacle.size.height
-        player.velocity.y = 0
        }
        else {player.position.y = obstacle.position.y - player.size.height;
-        player.velocity.y = 0}
+        }
+    }
+    else {
+      if (Math.abs(player.position.x + player.size.width - obstacle.position.x)>Math.abs(player.position.x - obstacle.position.x - obstacle.size.width)){
+      player.position.x = obstacle.position.x + obstacle.size.width
+      
+     }
+     else {player.position.x = obstacle.position.x - player.size.width;
+      }
     }}
       
-  }
+  
 function resize(){
     rect = canvas.getBoundingClientRect()  
     document.querySelector(':root').style.setProperty('--window',Math.sqrt(innerHeight**2+innerWidth**2)/50+"px")
@@ -1963,73 +2058,115 @@ function gameLoop(){
       if(fpsMax > fpsLimit){
         fpsMax = fpsLimit
       }
-    draw() 
+      if(document.hasFocus()){
+        draw() 
+      }
     then = performance.now()
-
-
-     /// HUD --------------------------------------
-    // CROSSHAIR
-  { ctx.save()
-    ctx.beginPath()
-    ctx.lineWidth = crosshairWidth
-    ctx.strokeStyle = crosshairColor
-    ctx.translate(mouse.event.x*canvas.width/rect.right,mouse.event.y*canvas.height/rect.bottom)
-  
-    ctx.moveTo(crosshairGap,0)
-    ctx.lineTo(crosshairGap + crosshairSize,0)
-  
-    ctx.moveTo(-crosshairGap,0)
-    ctx.lineTo(-crosshairSize - crosshairGap,0)
-    
-    ctx.moveTo(0,crosshairGap)
-    ctx.lineTo(0,crosshairSize + crosshairGap)
-  
-    ctx.moveTo(0,-crosshairGap)
-    ctx.lineTo(0,-crosshairSize - crosshairGap)
-  
-    ctx.stroke()
-  
-    ctx.closePath()
-    ctx.restore()
-    }
-    window.onresize = resize
-    /// HUD --------------------------------------
   }
     
   
   requestAnimationFrame(gameLoop)
 }
 gameLoop()
+function generateMap(){
+  // BORDERS (MESS TO BE IGNORED)
+  {
+  obstacles.push(new Obstacle(ctx,{x:0,y:0},{width:50,height:(canvas.height+worldBorder.y)/2 - ((canvas.height+worldBorder.y)/2)%50  - 50}))
+   obstacles.push(new Obstacle(ctx,{x:0,y:(canvas.height+worldBorder.y)/2 - (canvas.height+worldBorder.y)/2%50},{width:50,height:canvas.height+worldBorder.y - (canvas.height+worldBorder.y)/2 + ((canvas.height+worldBorder.y)/2)%50 + 50}))
 
-players.push(new Player(ctx,{x:100,y:500}))
-obstacles.push(new Obstacle(ctx,{x:600,y:200},{width:200,height:150}))
-obstacles.push(new Obstacle(ctx,{x:250,y:250},{width:100,height:100}))
-obstacles.push(new Obstacle(ctx,{x:250,y:700},{width:500,height:100}))
-obstacles.push(new Obstacle(ctx,{x:600,y:500},{width:100,height:100}))
-obstacles.push(new Obstacle(ctx,{x:300,y:500},{width:100,height:100}))
-obstacles.push(new Obstacle(ctx,{x:700,y:100},{width:100,height:100}))
-obstacles.push(new Obstacle(ctx,{x:800,y:400},{width:100,height:100}))
-obstacles.push(new Obstacle(ctx,{x:2600,y:900},{width:100,height:100}))
-obstacles.push(new Obstacle(ctx,{x:1000,y:500},{width:10,height:100}))
-obstacles.push(new Obstacle(ctx,{x:2500,y:800},{width:50,height:100}))
+   obstacles.push(new Obstacle(ctx,{x:canvas.width+worldBorder.x-(canvas.width+worldBorder.x)%50,y:50},{width:50,height:canvas.height+worldBorder.y - 50}))
+   obstacles.push(new Obstacle(ctx,{x:50,y:0},{width:canvas.width-50+worldBorder.x,height:50}))
+   obstacles.push(new Obstacle(ctx,{x:50,y:canvas.height+worldBorder.y -(canvas.height+worldBorder.y )%50},{width:canvas.width-50+worldBorder.x,height:50}))
+  }
+   var wall = false
+   for(var i = 0;i<(canvas.width+worldBorder.x - (canvas.width+worldBorder.x)%50)/250 - 1;i++){
+    for(var j=0;j<(canvas.height+worldBorder.y - (canvas.height+worldBorder.y)%50)/250 - 1;j++){
+     if(i == 0 && j == Math.floor(((canvas.height+worldBorder.y - 125)/2 - (canvas.height+worldBorder.y - 125)%50) / 250)){
+      // ENTRY 
+      obstacles.push(new Obstacle(ctx,{x:i*250+150,y:j*250+100},{width:50,height:150}))
+      obstacles.push(new Obstacle(ctx,{x:i*250+115,y:j*250+100},{width:35,height:35}))
+      obstacles.push(new Obstacle(ctx,{x:i*250+115,y:j*250+215},{width:35,height:35}))
+       continue
+     }
+     
+      var random = Math.round(Math.random()*10)
+      if(random <= 1){
+        // BLANK
+        for(var k = 0;k<Math.round(4*Math.random());k++){
+          enemies.push(new Enemy(ctx,{x:i*250+k*50 + 50,y:j*250+150},0))
+        }
+        continue
+      }
+      if(random == 2){
+        // PILLARS
+        obstacles.push(new Obstacle(ctx,{x:i*250+50,y:j*250+50},{width:100,height:50}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+200,y:j*250+50},{width:100,height:50}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+200,y:j*250+250},{width:100,height:50}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+50,y:j*250+250},{width:100,height:50}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+50,y:j*250+100},{width:50,height:50}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+50,y:j*250+200},{width:50,height:50}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+250,y:j*250+100},{width:50,height:50}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+250,y:j*250+200},{width:50,height:50}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+150,y:j*250+150},{width:50,height:50}))
+      }
+      if(random == 3){
+       // CROSS
+      obstacles.push(new Obstacle(ctx,{x:i*250+150,y:j*250+150},{width:50,height:50}))
+      obstacles.push(new Obstacle(ctx,{x:i*250+120,y:j*250+160},{width:30,height:30}))
+      obstacles.push(new Obstacle(ctx,{x:i*250+200,y:j*250+160},{width:30,height:30}))
+      obstacles.push(new Obstacle(ctx,{x:i*250+160,y:j*250+200},{width:30,height:30}))
+      obstacles.push(new Obstacle(ctx,{x:i*250+160,y:j*250+120},{width:30,height:30}))
+      for(var k = 0;k<Math.round(2*Math.random());k++){
+        enemies.push(new Enemy(ctx,{x:i*250+k*50 + 50,y:j*250+200},4))
+      }
+      }
+      if(random == 4){
+        // GIANT PILLAR
+        obstacles.push(new Obstacle(ctx,{x:i*250+100,y:j*250+100},{width:150,height:150}))
+        if(Math.random()<0.5){
+          items.push(new Item(ctx,{x:i*250 + 75,y:j*250+75},{x:0,y:0},0))
+        }
+      }
+      if(random == 5){
+        // OPEN ROOM
+        obstacles.push(new Obstacle(ctx,{x:i*250+50,y:j*250+50 },{width:50,height:100}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+50,y:j*250+200},{width:50,height:100}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+250,y:j*250+50 },{width:50,height:100}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+250,y:j*250+200},{width:50,height:100}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+100,y:j*250+50},{width:150,height:50}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+100,y:j*250+250},{width:150,height:50}))
+        for(var k = 0;k<Math.round(2*Math.random());k++){
+          enemies.push(new Enemy(ctx,{x:i*250+k*50 + 50,y:j*250+150},1))
+        }
+      }
+      if(random == 6){
+        // HALL 
+        obstacles.push(new Obstacle(ctx,{x:i*250+50,y:j*250+50},{width:100,height:90}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+50,y:j*250+210},{width:100,height:90}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+200,y:j*250+50},{width:100,height:90}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+200,y:j*250+210},{width:100,height:90}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+150,y:j*250+250},{width:50,height:50}))
+        obstacles.push(new Obstacle(ctx,{x:i*250+150,y:j*250+50},{width:50,height:50}))
+        for(var k = 0;k<Math.round(3*Math.random());k++){
+          enemies.push(new Enemy(ctx,{x:i*250+k*50 + 50,y:j*250+200},2))
+        }
+      }
+      if(random == 7 && !wall){
+        // WALL
+        wall = true
+        obstacles.push(new Obstacle(ctx,{x:i*250+50,y:j*250+50},{width:250,height:250}))
+      }
+    }
+      
+   }
+}
 
-items.push(new Item(ctx,{x:60,y:60},{x:0,y:0},0,0))
-//guns.push(new Gun(ctx,{x:100,y:50},{x:0,y:0},2,5))
-//guns.push(new Gun(ctx,{x:100,y:50},{x:0,y:0},1,5))
-//guns.push(new Gun(ctx,{x:50,y:50},{x:0,y:0},4,25))
-//guns.push(new Gun(ctx,{x:50,y:50},{x:0,y:0},3,25))
-guns.push(new Gun(ctx,{x:50,y:50},{x:0,y:0},2,25))
-//
+generateMap()
+
+players.push(new Player(ctx,{x:0,y:(canvas.height+worldBorder.y-125)*0.5}))
 document.querySelector(':root').style.setProperty('--window',Math.sqrt(innerHeight**2+innerWidth**2)/50+"px")
 
-enemies.push(new Enemy(ctx,{x:600,y:400},1))
-enemies.push(new Enemy(ctx,{x:500,y:500},2))
-enemies.push(new Enemy(ctx,{x:500,y:900},3))
-enemies.push(new Enemy(ctx,{x:500,y:900},4))
-enemies.push(new Enemy(ctx,{x:500,y:500},0))
-enemies.push(new Enemy(ctx,{x:200,y:700},1))
-enemies.push(new Enemy(ctx,{x:500,y:700},0))
-enemies.push(new Enemy(ctx,{x:400,y:500},0))
+
 
 
 
