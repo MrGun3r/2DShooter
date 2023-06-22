@@ -45,7 +45,7 @@ var interacted = false
 // FPS 
 var fps = 60;
 var fpsMax = 1;
-var fpsLimit = 60
+var fpsLimit = 600000000000
 var elapsedTime = 0;
 var then = performance.now()
 var startTime = performance.now()
@@ -2106,12 +2106,11 @@ function gameLoop(){
   var drawEnd = false
   // FPS COMPUTE  
   elapsedTime = performance.now() - then 
+  console.log(elapsedTime)
   if(timeSkip){
     elapsedTime = timeSkip - then
     timeSkip = 0
   }
-  
- 
   fps = Math.round(1000 / elapsedTime)
       startTime = performance.now();
       if(fps > fpsLimit){
@@ -2124,10 +2123,10 @@ function gameLoop(){
       if(fpsMax > fpsLimit){
         fpsMax = fpsLimit
       } 
-  if(elapsedTime > 1/fpsLimit * 1000 && ctx.globalCompositeOperation != 'luminosity'){
+  if(elapsedTime > (1/fpsLimit)* 1000 && ctx.globalCompositeOperation != 'luminosity'){
         draw()
+        then = performance.now()
   } 
-  then = performance.now()
   document.getElementById('fpsText').innerHTML = fps
   requestAnimationFrame(gameLoop)
 }
@@ -2285,6 +2284,5 @@ setInterval(()=>{
     }
   }
 },100)
-
 
 
