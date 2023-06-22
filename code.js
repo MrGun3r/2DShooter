@@ -4,6 +4,7 @@ ctx.imageSmoothingEnabled= false
 canvas.width = screen.width
 canvas.height = screen.height
 
+
 let rect = canvas.getBoundingClientRect()
 const mouse = {pos:{x:0,y:0},left:{pressed:false},right:{pressed:false},event:{x:0,y:0}}
 const keys = {a:{pressed:false},w:{pressed:false},s:{pressed:false},d:{pressed:false},e:{pressed:false},r:{pressed:false}}
@@ -25,6 +26,7 @@ var room = 0
 var timeSkip = 0
 var mapLoading = false
 var mapOpacity = 0
+var playerDeath = false
 var elapsedTime = 0
 //GENERAL
 const worldBorder = {x:0,y:0}
@@ -167,7 +169,7 @@ class Player{
         y:0
       }
       this.terminalVelocity = 100 * 1/fps
-      this.frictionCoefficient = 0.8 * 30/fps
+      this.frictionCoefficient = 0.5**(30/fps)
       this.acceleration = 30 * 1/fps
       this.size = {height:20,width:20}
       this.angle = 0
@@ -623,6 +625,7 @@ class Player{
       for(let i = 0;i<5;i++){
         particles.push(new Particle(ctx,{x:this.position.x,y:this.position.y},1,1))
       }
+      playerDeath = true
       players.splice(players.indexOf(this),1)
     }
     throw(){
@@ -680,11 +683,11 @@ class Player{
 }
 
 class Obstacle{
-  constructor(ctx,position,size){
+  constructor(ctx,position,size,door){
     this.ctx = ctx
     this.position = position
     this.size = size
-   
+    this.door = door
   }
   init(){
     this.update()
@@ -711,6 +714,14 @@ class Obstacle{
   
   update(){
     this.draw()
+    if(this.door != undefined){
+      if(this.door == 1 && this.position.y > (canvas.height+worldBorder.y)/2 - (canvas.height+worldBorder.y)/2%50 - 100){
+        this.position.y -= 0.5 * 30/fps 
+      }
+      if(this.door == 2 && this.position.y < (canvas.height+worldBorder.y)/2 - (canvas.height+worldBorder.y)/2%50 + 50){
+        this.position.y += 0.5 * 30/fps
+      }
+    }
   }
 }
 
@@ -810,7 +821,7 @@ class Bullet {
         width:20,
         height:30
        }
-      this.maxTravelDistance = 30
+      this.maxTravelDistance = 15
       this.speed = 10 * 30/fps
       this.damage = 10
      }
@@ -871,7 +882,7 @@ class Bullet {
     +this.size.height/2)
     this.ctx.rotate(this.angle+3*Math.PI/2)
     this.ctx.globalAlpha = 1 -i*0.1
-    this.ctx.drawImage(bullet,0,0,this.size.width,this.size.height)
+    this.ctx.drawImage(bullet,5*Math.cos(this.angle),5*Math.sin(this.angle),this.size.width,this.size.height)
     this.ctx.rotate(-this.angle-3*Math.PI/2)
     this.ctx.translate(-this.position.x+2*i*Math.cos(this.angle)-this.size.width/2,-this.position.y+2*i*Math.sin(this.angle)-this.size.height/2)}
     this.ctx.restore()}
@@ -1202,7 +1213,7 @@ class Enemy{
    this.ctx.restore()
 
      //TRACE PATH 
-    //if (this.findingPath) {
+     //if (this.findingPath) {
      // this.ctx.beginPath()
      // this.ctx.moveTo(this.position.x,this.position.y)
      // this.ctx.lineWidth = 2
@@ -1425,7 +1436,7 @@ class Enemy{
         
         enemies.splice(enemies.indexOf(this),1)
      }
-     drop(){
+    drop(){
       guns.push(new Gun(ctx,{x:this.position.x,y:this.position.y},{x:5*Math.cos(this.angle),y:5*Math.sin(this.angle)},this.weapon,this.mag))
       if(Math.random() > 0){
         items.push(new Item(ctx,{x:this.position.x,y:this.position.y},{x:3*Math.cos(this.angle),y:3*Math.sin(this.angle)},this.weapon))
@@ -1476,7 +1487,7 @@ class Enemy{
     
         this.realSpot = {position:{x:this.i*cols + camera.x,y:this.j*rows+camera.y},size:{width:this.width,height:this.height}}
         obstacles.forEach((obstacle)=>{
-          if(Collision(obstacle,this.realSpot)){
+          if(Collision(obstacle,this.realSpot) && obstacle.door == undefined){
             this.wall = true  
           }
         })
@@ -1596,8 +1607,8 @@ class Gun{
   }
   draw(){
     this.ctx.save()
-    this.ctx.rect(this.position.x,this.position.y,this.size.width,this.size.height)
-    this.ctx.stroke()
+   //this.ctx.rect(this.position.x,this.position.y,this.size.width,this.size.height)
+   //this.ctx.stroke()
     this.ctx.translate(this.position.x+this.size.width/2,this.position.y+this.size.height/2)
     this.ctx.rotate(this.angle)
     this.ctx.translate(-this.size.width/2,-this.size.height/2)
@@ -1634,7 +1645,7 @@ class Item{
     this.rotation = 1
     this.item = item
     if(this.item == 4){
-      this.item = 3
+      this.item = 1
     }
     if (this.item == 0){
       this.value = 20
@@ -1738,7 +1749,21 @@ class Item{
   }
 }
 function draw(){  
-  if(players.length == 0){
+  if(playerDeath){
+    if(!gameEnded){
+      setTimeout(()=>{
+        ctx.globalCompositeOperation = 'luminosity';
+        document.getElementById('endGame').style.display = "flex"
+        document.querySelector(':root').style.setProperty('--blur',2+"px")
+        document.getElementById('html').style.cursor = "auto"
+        draw()
+        obstacles.length = 0
+        particles.length = 0
+        enemies.length = 0
+        items.length = 0
+        guns.length = 0
+      },2000)   
+    }
    gameEnded = true
   } 
     // AUDIO
@@ -1808,11 +1833,11 @@ function draw(){
       if(enemies.length <= 0){
         mapLoading = true
       }
-      if(room > 0 && enemies.length <= 0 && mapLoading &&(player.position.x-player.position.x%50 == 0 && (player.position.y+ 50)-(player.position.y%50)  == (canvas.height+worldBorder.y)/2 -((canvas.height+worldBorder.y)/2)%50)){
+      if(room > 0 && enemies.length <= 0 && mapLoading && (player.position.x-player.position.x%10 == 0)){
         obstacles.length = 0
         room++
         items.length = 0
-        
+        particles.length = 0
         guns.length = 0
         if(room > 0){
           worldBorder.x = 1000*Math.random()
@@ -1874,6 +1899,12 @@ function draw(){
       }
      })
     })
+    if(camera.x > worldBorder.x){
+      camera.x = camera.x*0.5 + 0.5*worldBorder.x
+    }
+    if(camera.y > worldBorder.y){
+      camera.y = camera.y*0.8 + 0.2*worldBorder.y
+    }
     camera.x = (Math.abs(camera.x)+camera.x)/2
     camera.y = (Math.abs(camera.y)+camera.y)/2
    //if(mapLoading){
@@ -2071,10 +2102,8 @@ addEventListener('mousemove',(event)=>{
 
 // GAME START 
 function gameLoop(){
-  // LISTEN FOR rAF STOPS
-
-  
-
+  // BOOL
+  var drawEnd = false
   // FPS COMPUTE  
   elapsedTime = performance.now() - then 
   if(timeSkip){
@@ -2095,8 +2124,7 @@ function gameLoop(){
       if(fpsMax > fpsLimit){
         fpsMax = fpsLimit
       } 
-  if(elapsedTime > 1/fpsLimit * 1000){
-       
+  if(elapsedTime > 1/fpsLimit * 1000 && ctx.globalCompositeOperation != 'luminosity'){
         draw()
   } 
   then = performance.now()
@@ -2107,21 +2135,19 @@ gameLoop()
 function generateMap(){
   // BORDERS (MESS TO BE IGNORED)
   {
-  obstacles.push(new Obstacle(ctx,{x:0,y:0},{width:50,height:(canvas.height+worldBorder.y)/2 - ((canvas.height+worldBorder.y)/2)%50  - 50}))
-   obstacles.push(new Obstacle(ctx,{x:0,y:(canvas.height+worldBorder.y)/2 - (canvas.height+worldBorder.y)/2%50},{width:50,height:canvas.height+worldBorder.y - (canvas.height+worldBorder.y)/2 + ((canvas.height+worldBorder.y)/2)%50 + 50}))
-
+  obstacles.push(new Obstacle(ctx,{x:0,y:0},{width:50,height:(canvas.height+worldBorder.y)/2 - ((canvas.height+worldBorder.y)/2)%50 -50}))
+   obstacles.push(new Obstacle(ctx,{x:0,y:(canvas.height+worldBorder.y)/2 - (canvas.height+worldBorder.y)/2%50 + 50},{width:50,height:canvas.height+worldBorder.y - (canvas.height+worldBorder.y)/2 + ((canvas.height+worldBorder.y)/2)%50 + 50}))
    obstacles.push(new Obstacle(ctx,{x:canvas.width+worldBorder.x-(canvas.width+worldBorder.x)%50,y:50},{width:50,height:canvas.height+worldBorder.y - 50}))
    obstacles.push(new Obstacle(ctx,{x:50,y:0},{width:canvas.width-50+worldBorder.x,height:50}))
    obstacles.push(new Obstacle(ctx,{x:50,y:canvas.height+worldBorder.y -(canvas.height+worldBorder.y )%50},{width:canvas.width-50+worldBorder.x,height:50}))
+   // DOOR 
+   obstacles.push(new Obstacle(ctx,{x:50,y:(canvas.height+worldBorder.y)/2 - (canvas.height+worldBorder.y)/2%50 - 50},{width:5,height:50},1))
+   obstacles.push(new Obstacle(ctx,{x:50,y:(canvas.height+worldBorder.y)/2 - (canvas.height+worldBorder.y)/2%50 },{width:5,height:50},2))
   }
+  var wall = false
    for(var j=0;j<(canvas.height+worldBorder.y - (canvas.height+worldBorder.y)%50)/250 - 1;j++){
-    var wall = false
     for(var i = 0;i<(canvas.width+worldBorder.x - (canvas.width+worldBorder.x)%50)/250 - 1;i++){
-      if(i == 0){
-        var noEnemy = true
-      }
-      else {var noEnemy = false}
-     if(i == 0 && j == Math.floor(((canvas.height+worldBorder.y - 125)/2 - (canvas.height+worldBorder.y - 125)%50) / 250)){
+     if(i == 0 && j == Math.floor(((canvas.height+worldBorder.y - 125) - (canvas.height+worldBorder.y - 125)%50) / 500)){
       // ENTRY 
       obstacles.push(new Obstacle(ctx,{x:i*250+150,y:j*250+100},{width:50,height:150}))
       obstacles.push(new Obstacle(ctx,{x:i*250+115,y:j*250+100},{width:35,height:35}))
@@ -2130,6 +2156,11 @@ function generateMap(){
      }
      
       var random = Math.round(Math.random()*10)
+      if(i == 0){
+        var noEnemy = true
+        random = Math.round(Math.random()*2)
+      }
+      else {var noEnemy = false}
       if(random <= 1){
         // BLANK
         if(!noEnemy){
@@ -2139,7 +2170,7 @@ function generateMap(){
         continue
       }
       }
-      if(random == 2){
+      if(random == 3){
         // PILLARS
         obstacles.push(new Obstacle(ctx,{x:i*250+50,y:j*250+50},{width:100,height:50}))
         obstacles.push(new Obstacle(ctx,{x:i*250+200,y:j*250+50},{width:100,height:50}))
@@ -2150,8 +2181,14 @@ function generateMap(){
         obstacles.push(new Obstacle(ctx,{x:i*250+250,y:j*250+100},{width:50,height:50}))
         obstacles.push(new Obstacle(ctx,{x:i*250+250,y:j*250+200},{width:50,height:50}))
         obstacles.push(new Obstacle(ctx,{x:i*250+150,y:j*250+150},{width:50,height:50}))
+        if(!noEnemy){
+          for(var k = 0;k<Math.round(2*Math.random());k++){
+            enemies.push(new Enemy(ctx,{x:i*250+k*100 + 100,y:j*250+Math.round(Math.random()*200)},3))
+          }
+    
+        }
       }
-      if(random == 3){
+      if(random == 2){
        // CROSS
       obstacles.push(new Obstacle(ctx,{x:i*250+150,y:j*250+150},{width:50,height:50}))
       obstacles.push(new Obstacle(ctx,{x:i*250+120,y:j*250+160},{width:30,height:30}))
@@ -2218,8 +2255,26 @@ function entryMap(){
   obstacles.push(new Obstacle(ctx,{x:canvas.width-50,y:3*canvas.height/4-150},{width:50,height:150}))
 } 
 entryMap()
+function restart(){
+  entryMap()
+  room = 0
+  gameEnded = false
+  playerDeath = false
+  
+  // VISUAL 
+  ctx.globalCompositeOperation = "source-over"
+  document.getElementById('endGame').style.display = "none"
+  document.querySelector(':root').style.setProperty('--blur',0+"px")
+  document.getElementById('html').style.cursor = "none"
+  camera.x = 0
+  camera.y = 0
+  worldBorder.x = 0
+  worldBorder.y = 0
 
-players.push(new Player(ctx,{x:500,y:(canvas.height+worldBorder.y-125)*0.5}))
+
+  players.push(new Player(ctx,{x:1000,y:(canvas.height+worldBorder.y-125)*0.5}))
+}
+players.push(new Player(ctx,{x:1000,y:(canvas.height+worldBorder.y-125)*0.5}))
 document.querySelector(':root').style.setProperty('--window',Math.sqrt(innerHeight**2+innerWidth**2)/50+"px")
 
 setInterval(()=>{
@@ -2229,7 +2284,7 @@ setInterval(()=>{
       timeSkip = performance.now()
     }
   }
-},0)
+},100)
 
 
 
