@@ -14,9 +14,20 @@ const bullets = []
 const particles = []
 const guns = []
 const items = []
+
+
+
+//GENERAL
+var mainMenu = false
+var gameEnded = false
+var gamePaused = false
+var room = 0
+var timeSkip = 0
 var mapLoading = false
 var mapOpacity = 0
-const worldBorder = {x:Math.random()*1000,y:Math.random()*1000}
+var elapsedTime = 0
+//GENERAL
+const worldBorder = {x:0,y:0}
 worldBorder.x -= worldBorder.x%50
 worldBorder.y -= worldBorder.y%50
 const camera = {x:0,y:0}
@@ -24,15 +35,15 @@ const camera = {x:0,y:0}
 var interacted = false
 
 // CROSSHAIR
-  var crosshairSize = 10
-  var crosshairWidth = 3
+  var crosshairSize = 6
+  var crosshairWidth = 5
   var crosshairGap = 2
   var crosshairColor = "green"
 //
 // FPS 
 var fps = 60;
 var fpsMax = 1;
-var fpsLimit = 100000
+var fpsLimit = 60
 var elapsedTime = 0;
 var then = performance.now()
 var startTime = performance.now()
@@ -225,13 +236,19 @@ class Player{
         document.querySelector(':root').style.setProperty('--mag',this.mag*3.333+"%")
       }
 
-      
-      if(enemies.length <= 0){
+      if(room > 0){
+        if(enemies.length <= 0){
         document.getElementById('enemiesText').innerHTML = "Exit room"
       }
       else {
         document.getElementById('enemiesText').innerHTML = enemies.length+' left'
       }
+      }
+      else {
+        document.getElementById('enemiesText').innerHTML = " "
+      }
+      document.getElementById('room').innerHTML = "Room "+room
+      
     }
     rotate(){
       this.angle = Math.atan2(mouse.pos.y-this.position.y-this.size.height/2,mouse.pos.x-this.position.x-this.size.width/2)
@@ -340,7 +357,7 @@ class Player{
           this.fist.arm -= 1 * 30/fps
           this.fist.punched = true
           if(!this.fist.attacked){
-            bullets.push(new Bullet(ctx,{x:this.position.x+this.size.width/2,y:this.position.y+this.size.height/2,},this.angle,0,0,0))
+            bullets.push(new Bullet(ctx,{x:this.position.x+this.size.width/2,y:this.position.y+this.size.height/2,},this.angle,0,0,0,this))
             this.fist.attacked = true
             if(this.fist.hand){
               noises.push(sounds.swing1.cloneNode())
@@ -471,7 +488,7 @@ class Player{
         }
         else if (this.gun.active && !this.gun.loading && this.weapon == 2){
             for (let i = -2*Math.PI/24;i<=2*Math.PI/24;i+=Math.PI/24){
-              bullets.push(new Bullet(ctx,{x:this.position.x+this.size.width/2,y:this.position.y+this.size.height/2},this.angle+i,inaccuracy,this.weapon,0))
+              bullets.push(new Bullet(ctx,{x:this.position.x+this.size.width/2,y:this.position.y+this.size.height/2},this.angle+i,inaccuracy,this.weapon,0,this))
             }
             if(this.weapon == 2){
               noises.push(sounds.shotgun.cloneNode())
@@ -772,7 +789,7 @@ class Particle{
 }
 
 class Bullet {
-  constructor(ctx,position,angle,inaccuracy,type,emitter){
+  constructor(ctx,position,angle,inaccuracy,type,emitter,obj){
     this.ctx = ctx
      this.position = position
      this.originPos = {x:this.position.x,y:this.position.y}
@@ -780,12 +797,12 @@ class Bullet {
      // 0 PLAYER
      // 1 ENEMY
      this.emitter = emitter 
-
+     this.emitterObj = obj
      this.gotPast = []
      this.gotPast1 = []
      this.inaccuracyRange = 40
      this.angle = angle + (2*Math.random()-1)*inaccuracy / this.inaccuracyRange
-     this.speed = 70 * 30/fps
+     this.speed = 50 * 30/fps
      this.type = type
      this.maxTravelDistance = 1000
      if(this.type == 0){
@@ -868,11 +885,11 @@ class Bullet {
     if(this.type > 0){
     obstacles.forEach((obstacle)=>{
      if (lineRect({
-        position:{x:this.originPos.x,y:this.originPos.y},size:this.size},obstacle,this,false,0) && 
+        position:{x:this.originPos.x,y:this.originPos.y},size:this.size},obstacle,this,false) && 
         lineRect({
-          position:{x:this.originPos.x,y:this.originPos.y},size:this.size},obstacle,this,true,0) != undefined){
+          position:{x:this.originPos.x,y:this.originPos.y},size:this.size},obstacle,this,true) != undefined){
           this.position = lineRect({
-            position:{x:this.originPos.x,y:this.originPos.y},size:this.size},obstacle,this,true,0)
+            position:{x:this.originPos.x,y:this.originPos.y},size:this.size},obstacle,this,true)
           this.collided.bool = true;
           this.collided.type = 0
       }
@@ -898,11 +915,11 @@ class Bullet {
         if(this.type > 0){
           
       if (lineRect({
-        position:{x:this.originPos.x,y:this.originPos.y},size:this.size},enemy,this,false,0) && 
+        position:{x:this.originPos.x,y:this.originPos.y},size:this.size},enemy,this,false) && 
         lineRect({
-          position:{x:this.originPos.x,y:this.originPos.y},size:this.size},enemy,this,true,0) != undefined && !this.gotPast.includes(index)){
+          position:{x:this.originPos.x,y:this.originPos.y},size:this.size},enemy,this,true) != undefined && !this.gotPast.includes(index)){
           this.position = lineRect({
-            position:{x:this.originPos.x,y:this.originPos.y},size:this.size},enemy,this,true,0)
+            position:{x:this.originPos.x,y:this.originPos.y},size:this.size},enemy,this,true)
           this.collided.bool = true;
           this.collided.type = 1
           enemy.hurt(this.damage,this.angle)}
@@ -924,21 +941,21 @@ class Bullet {
     if(this.emitter == 1){
       players.forEach((player,index)=>{
         if (lineRect({
-          position:{x:this.originPos.x,y:this.originPos.y},size:this.size},player,this,false,0) && 
+          position:{x:this.originPos.x,y:this.originPos.y},size:this.size},player,this,false) && 
           lineRect({
-            position:{x:this.originPos.x,y:this.originPos.y},size:this.size},player,this,true,0) != undefined && !this.gotPast1.includes(index)){
+            position:{x:this.originPos.x,y:this.originPos.y},size:this.size},player,this,true) != undefined && !this.gotPast1.includes(index)){
             this.position = lineRect({
-              position:{x:this.originPos.x,y:this.originPos.y},size:this.size},player,this,true,0)
+              position:{x:this.originPos.x,y:this.originPos.y},size:this.size},player,this,true)
             this.collided.bool = true;
             this.collided.type = 1
             player.hurt(this.damage,this.angle)
         }
-        enemies.forEach((enemy)=>{
-          if(Math.sqrt((enemy.position.x+player.size.width/2-this.position.x-this.size.width/2)**2+(enemy.position.y+enemy.size.height/2-this.position.y-this.size.height/2)**2)>
-          Math.sqrt((enemy.position.x+enemy.size.width/2-player.position.x-player.size.width/2)**2+(enemy.position.y+enemy.size.height/2-player.position.y-player.size.height/2)**2) && !this.gotPast1.includes(index)){
+        
+          if(Math.sqrt((this.emitterObj.position.x+this.emitterObj.size.width/2-this.position.x-this.size.width/2)**2+(this.emitterObj.position.y+this.emitterObj.size.height/2-this.position.y-this.size.height/2)**2)>
+          Math.sqrt((this.emitterObj.position.x+this.emitterObj.size.width/2-player.position.x-player.size.width/2)**2+(this.emitterObj.position.y+this.emitterObj.size.height/2-player.position.y-player.size.height/2)**2) && !this.gotPast1.includes(index)){
             this.gotPast1.push(index)
           }
-        })
+        
       })
       
     }
@@ -953,7 +970,7 @@ class Bullet {
      if (this.travelDistance > this.maxTravelDistance){
       bullets.splice(bullets.indexOf(this),1)
      }
-     this.speed = 70 * 30/fps
+     this.speed = 50 * 30/fps
   }
 
 }
@@ -964,7 +981,7 @@ class Enemy{
       this.position = position
       this.velocity = {x:0,y:0}
       this.size = {width:20,height:20}
-      this.speed = 4 * 30/fps
+      this.speed = 3 * 30/fps
       this.angle = 0
       this.idle = {
         bool:true,
@@ -1003,7 +1020,7 @@ class Enemy{
         fire:false,
         fired:false,
         ready:false,
-        reactionTime:1000
+        reactionTime:700 * Math.round(2/room)
       }
       if(this.weapon == 1){
         this.gun.firerate = 500  
@@ -1185,17 +1202,17 @@ class Enemy{
    this.ctx.restore()
 
      //TRACE PATH 
-    if (this.findingPath) {
-      this.ctx.beginPath()
-      this.ctx.moveTo(this.position.x,this.position.y)
-      this.ctx.lineWidth = 2
-      
-      for (let i = 0;i<this.trajectory.path.length;i++){
-        this.ctx.lineTo(this.trajectory.path[i].x,this.trajectory.path[i].y)
-      }
-      this.ctx.stroke()
+    //if (this.findingPath) {
+     // this.ctx.beginPath()
+     // this.ctx.moveTo(this.position.x,this.position.y)
+     // this.ctx.lineWidth = 2
+     // 
+     // for (let i = 0;i<this.trajectory.path.length;i++){
+     //   this.ctx.lineTo(this.trajectory.path[i].x,this.trajectory.path[i].y)
+     // }
+     // this.ctx.stroke()
       //TRACE PATH 
-       } 
+    //   } 
     }
     weaponInfo(){
       if(this.weapon == 1){
@@ -1277,7 +1294,8 @@ class Enemy{
       if(this.mag > 0){
       var inaccuracy = Math.sqrt(this.velocity.x**2+this.velocity.y**2)
       if(this.gun.active && !this.gun.loading && this.weapon != 2){
-        bullets.push(new Bullet(ctx,{x:this.position.x+this.size.width/2,y:this.position.y+this.size.height/2,},this.angle,inaccuracy,this.weapon,1))
+        bullets.push(new Bullet(ctx,{x:this.position.x+this.size.width/2,y:this.position.y+this.size.height/2,},this.angle,inaccuracy,this.weapon,1,this))
+
         if(this.weapon == 1){
           noises.push(sounds.revolver.cloneNode())
         }
@@ -1294,7 +1312,7 @@ class Enemy{
       }
       else if (this.gun.active && !this.gun.loading && this.weapon == 2){
           for (let i = -2*Math.PI/24;i<=2*Math.PI/24;i+=Math.PI/24){
-            bullets.push(new Bullet(ctx,{x:this.position.x+this.size.width/2,y:this.position.y+this.size.height/2},this.angle+i,inaccuracy,this.weapon,1))
+            bullets.push(new Bullet(ctx,{x:this.position.x+this.size.width/2,y:this.position.y+this.size.height/2},this.angle+i,inaccuracy,this.weapon,1,this))
           }
           noises.push(sounds.shotgun.cloneNode())
           this.gun.active = false
@@ -1384,6 +1402,7 @@ class Enemy{
       if(this.aware){
         this.speed = 3 * 30/fps
       }
+      
       
       
      }
@@ -1485,18 +1504,7 @@ class Enemy{
             grid[i][j].neighbors.push(grid[i][j - 1]);}
             if (i > 0) {
             grid[i][j].neighbors.push(grid[i - 1][j]);}
-            if (i > 0 && j > 0) {
-              grid[i][j].neighbors.push(grid[i - 1][j - 1]);
-            }
-            if (i < cols - 1 && j > 0) {
-              grid[i][j].neighbors.push(grid[i + 1][j - 1]);
-            }
-            if (i > 0 && j < rows - 1) {
-              grid[i][j].neighbors.push(grid[i - 1][j + 1]);
-            }
-            if (i < cols - 1 && j < rows - 1) {
-              grid[i][j].neighbors.push(grid[i + 1][j + 1]);
-            }
+
             
         }
       }
@@ -1729,7 +1737,10 @@ class Item{
     this.rotation *= 0.8
   }
 }
-function draw(){   
+function draw(){  
+  if(players.length == 0){
+   gameEnded = true
+  } 
     // AUDIO
     noises.forEach((noise,index)=>{
       if(Math.round(noise.duration*10) <= Math.round(noise.currentTime*10)){
@@ -1761,13 +1772,17 @@ function draw(){
     
    
      //TILING
-    ctx.globalAlpha = 0.5
-    for (let i = 0;i<canvas.width+camera.x;i+= 100){
+    
+    
+      ctx.globalAlpha = 0.5
+      for (let i = 0;i<canvas.width+camera.x;i+= 100){
       for ( let j = 0;j <canvas.height+camera.y;j+= 100){
         ctx.drawImage(floor,i,j,100,100)
       }
     }
     ctx.globalAlpha = 1
+    
+   
 
     items.forEach((item)=>{
     item.init()
@@ -1783,13 +1798,29 @@ function draw(){
     })
     
     players.forEach((player)=>{
+      if(player.position.x + player.size.width/2> canvas.width-50 && room <= 0){
+        room++
+        obstacles.length = 0
+        generateMap()
+        player.position.x = 25
+        player.position.y = (canvas.height + worldBorder.y)/2 - player.size.height/2 - 25
+      }
       if(enemies.length <= 0){
         mapLoading = true
       }
-      if(enemies.length <= 0 && mapLoading &&(player.position.x-player.position.x%50 == 0 && (player.position.y+ 50)-(player.position.y%50)  == (canvas.height+worldBorder.y)/2 -((canvas.height+worldBorder.y)/2)%50)){
+      if(room > 0 && enemies.length <= 0 && mapLoading &&(player.position.x-player.position.x%50 == 0 && (player.position.y+ 50)-(player.position.y%50)  == (canvas.height+worldBorder.y)/2 -((canvas.height+worldBorder.y)/2)%50)){
         obstacles.length = 0
+        room++
         items.length = 0
-        generateMap()
+        
+        guns.length = 0
+        if(room > 0){
+          worldBorder.x = 1000*Math.random()
+          worldBorder.y = 1000*Math.random()
+          player.position.x = 25
+          player.position.y = (canvas.height + worldBorder.y)/2 - player.size.height/2 - 25
+          generateMap()
+        }
         mapLoading = false
        }
        player.init()
@@ -1800,7 +1831,7 @@ function draw(){
         }
         if(enemy.inBounds){
           for (let i=0;i < obstacles.length;i++){
-            if (lineRect(player,obstacles[i],enemy,false,1) && lineRect(player,obstacles[i],enemy,false,2)){
+            if (lineRect(player,obstacles[i],enemy,false) && lineRect(player,obstacles[i],enemy,false)){
               enemy.aware = false
               if(!enemy.alerted){
                 enemy.idle.bool = true
@@ -1884,35 +1915,35 @@ function draw(){
     }
     window.onresize = resize
     /// HUD --------------------------------------
-}
 
+}
 function lineRect(player,obstacle,enemy,bool,side){
   // (x1,y1) (x2,y2) BEING THE VISION LINE 
   // (x3,y3) LINE OF THE RECT  // x4 && y4 NOT NEEDED
-  if(side == 0){
+  //if(side == 0){
   x1 = enemy.position.x+enemy.size.width/2
   y1 = enemy.position.y+enemy.size.height/2
   x2 = player.position.x+player.size.width/2
   y2 = player.position.y+player.size.height/2
   x3 = obstacle.position.x
   y3 = obstacle.position.y
-  }
-  if(side == 1){
-  x1 = enemy.position.x+enemy.size.width/2
-  y1 = enemy.position.y  
-  x2 = player.position.x+player.size.width/2
-  y2 = player.position.y+player.size.height/2
-  x3 = obstacle.position.x
-  y3 = obstacle.position.y
-  }
-  if(side == 2){
-  x1 = enemy.position.x+enemy.size.width
-  y1 = enemy.position.y+enemy.size.height
-  x2 = player.position.x+player.size.width/2
-  y2 = player.position.y+player.size.height/2
-  x3 = obstacle.position.x
-  y3 = obstacle.position.y
-  }
+  //}
+  //if(side == 1){
+  //x1 = enemy.position.x+enemy.size.width/2
+  //y1 = enemy.position.y  
+  //x2 = player.position.x+player.size.width/2
+  //y2 = player.position.y+player.size.height/2
+  //x3 = obstacle.position.x
+  //y3 = obstacle.position.y
+  //}
+  //if(side == 2){
+  //x1 = enemy.position.x+enemy.size.width
+  //y1 = enemy.position.y+enemy.size.height
+  //x2 = player.position.x+player.size.width/2
+  //y2 = player.position.y+player.size.height/2
+  //x3 = obstacle.position.x
+  //y3 = obstacle.position.y
+  //}
   let top = LineCollision(x1,y1,x2,y2,x3,y3,x3+obstacle.size.width,y3,bool) // TOP
   let left = LineCollision(x1,y1,x2,y2,x3,y3,x3,y3+obstacle.size.height,bool) // LEFT
   let right  = LineCollision(x1,y1,x2,y2,x3+obstacle.size.width,y3,x3+obstacle.size.width,y3+obstacle.size.height,bool) // RIGHT
@@ -2040,31 +2071,36 @@ addEventListener('mousemove',(event)=>{
 
 // GAME START 
 function gameLoop(){
+  // LISTEN FOR rAF STOPS
+
   
+
   // FPS COMPUTE  
-  elapsedTime = performance.now() - then
-  if(elapsedTime > 1/fpsLimit * 1000){
-    {
-      let elapsedTime = performance.now() - startTime;
-      fps = Math.round(1000 / elapsedTime)
+  elapsedTime = performance.now() - then 
+  if(timeSkip){
+    elapsedTime = timeSkip - then
+    timeSkip = 0
+  }
+  
+ 
+  fps = Math.round(1000 / elapsedTime)
       startTime = performance.now();
       if(fps > fpsLimit){
         fps = fpsLimit
       }
-      }
+      
       if (fps > fpsMax){
         fpsMax = fps
       }
       if(fpsMax > fpsLimit){
         fpsMax = fpsLimit
-      }
-      if(document.hasFocus()){
-        draw() 
-      }
-    then = performance.now()
-  }
-    
-  
+      } 
+  if(elapsedTime > 1/fpsLimit * 1000){
+       
+        draw()
+  } 
+  then = performance.now()
+  document.getElementById('fpsText').innerHTML = fps
   requestAnimationFrame(gameLoop)
 }
 gameLoop()
@@ -2078,9 +2114,13 @@ function generateMap(){
    obstacles.push(new Obstacle(ctx,{x:50,y:0},{width:canvas.width-50+worldBorder.x,height:50}))
    obstacles.push(new Obstacle(ctx,{x:50,y:canvas.height+worldBorder.y -(canvas.height+worldBorder.y )%50},{width:canvas.width-50+worldBorder.x,height:50}))
   }
-   var wall = false
-   for(var i = 0;i<(canvas.width+worldBorder.x - (canvas.width+worldBorder.x)%50)/250 - 1;i++){
-    for(var j=0;j<(canvas.height+worldBorder.y - (canvas.height+worldBorder.y)%50)/250 - 1;j++){
+   for(var j=0;j<(canvas.height+worldBorder.y - (canvas.height+worldBorder.y)%50)/250 - 1;j++){
+    var wall = false
+    for(var i = 0;i<(canvas.width+worldBorder.x - (canvas.width+worldBorder.x)%50)/250 - 1;i++){
+      if(i == 0){
+        var noEnemy = true
+      }
+      else {var noEnemy = false}
      if(i == 0 && j == Math.floor(((canvas.height+worldBorder.y - 125)/2 - (canvas.height+worldBorder.y - 125)%50) / 250)){
       // ENTRY 
       obstacles.push(new Obstacle(ctx,{x:i*250+150,y:j*250+100},{width:50,height:150}))
@@ -2092,10 +2132,12 @@ function generateMap(){
       var random = Math.round(Math.random()*10)
       if(random <= 1){
         // BLANK
+        if(!noEnemy){
         for(var k = 0;k<Math.round(4*Math.random());k++){
           enemies.push(new Enemy(ctx,{x:i*250+k*50 + 50,y:j*250+150},0))
         }
         continue
+      }
       }
       if(random == 2){
         // PILLARS
@@ -2116,9 +2158,12 @@ function generateMap(){
       obstacles.push(new Obstacle(ctx,{x:i*250+200,y:j*250+160},{width:30,height:30}))
       obstacles.push(new Obstacle(ctx,{x:i*250+160,y:j*250+200},{width:30,height:30}))
       obstacles.push(new Obstacle(ctx,{x:i*250+160,y:j*250+120},{width:30,height:30}))
+      if(!noEnemy){
       for(var k = 0;k<Math.round(2*Math.random());k++){
         enemies.push(new Enemy(ctx,{x:i*250+k*50 + 50,y:j*250+200},4))
       }
+
+    }
       }
       if(random == 4){
         // GIANT PILLAR
@@ -2135,9 +2180,12 @@ function generateMap(){
         obstacles.push(new Obstacle(ctx,{x:i*250+250,y:j*250+200},{width:50,height:100}))
         obstacles.push(new Obstacle(ctx,{x:i*250+100,y:j*250+50},{width:150,height:50}))
         obstacles.push(new Obstacle(ctx,{x:i*250+100,y:j*250+250},{width:150,height:50}))
+        if(!noEnemy){
         for(var k = 0;k<Math.round(2*Math.random());k++){
           enemies.push(new Enemy(ctx,{x:i*250+k*50 + 50,y:j*250+150},1))
         }
+       
+      }
       }
       if(random == 6){
         // HALL 
@@ -2147,9 +2195,12 @@ function generateMap(){
         obstacles.push(new Obstacle(ctx,{x:i*250+200,y:j*250+210},{width:100,height:90}))
         obstacles.push(new Obstacle(ctx,{x:i*250+150,y:j*250+250},{width:50,height:50}))
         obstacles.push(new Obstacle(ctx,{x:i*250+150,y:j*250+50},{width:50,height:50}))
-        for(var k = 0;k<Math.round(3*Math.random());k++){
+        if(!noEnemy){
+          for(var k = 0;k<Math.round(3*Math.random());k++){
           enemies.push(new Enemy(ctx,{x:i*250+k*50 + 50,y:j*250+200},2))
         }
+        }
+        
       }
       if(random == 7 && !wall){
         // WALL
@@ -2160,13 +2211,25 @@ function generateMap(){
       
    }
 }
+function entryMap(){
+  obstacles.push(new Obstacle(ctx,{x:0,y:0},{width:canvas.width,height:1*canvas.height/4}))
+  obstacles.push(new Obstacle(ctx,{x:0,y:3*canvas.height/4},{width:canvas.width,height:1*canvas.height/4}))
+  obstacles.push(new Obstacle(ctx,{x:canvas.width-50,y:canvas.height/4},{width:50,height:100}))
+  obstacles.push(new Obstacle(ctx,{x:canvas.width-50,y:3*canvas.height/4-150},{width:50,height:150}))
+} 
+entryMap()
 
-generateMap()
-
-players.push(new Player(ctx,{x:0,y:(canvas.height+worldBorder.y-125)*0.5}))
+players.push(new Player(ctx,{x:500,y:(canvas.height+worldBorder.y-125)*0.5}))
 document.querySelector(':root').style.setProperty('--window',Math.sqrt(innerHeight**2+innerWidth**2)/50+"px")
 
-
+setInterval(()=>{
+  if(document.hidden){
+    gamePaused = true
+    if(!timeSkip){
+      timeSkip = performance.now()
+    }
+  }
+},0)
 
 
 
