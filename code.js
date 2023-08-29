@@ -168,18 +168,19 @@ class Player{
         x:0,
         y:0
       }
-      this.terminalVelocity = 100 * 1/fps
-      this.frictionCoefficient = 0.5**(30/fps)
-      this.acceleration = 30 * 1/fps
+      this.terminalVelocity = 150 * 30/fps
+      this.frictionCoefficient = 0.001**(30/fps)
+      this.acceleration = 100 * 30/fps
       this.size = {height:20,width:20}
       this.angle = 0
+      this.diagonalMvt = false
     }
     init(){
-      this.draw()
-      this.update()
       // CAMERA MOVEMENT 
       this.camera()
       // ESSENTIAL CONTROLS 
+      this.movement()
+      this.update()
       this.movement()
       this.rotate()
       // ATTACK
@@ -207,7 +208,8 @@ class Player{
         this.HTMLINFO()
       // COLLISION 
       this.collision()
-
+      
+      this.draw()
     }
     HTMLINFO(){
       document.getElementById('magCount').innerHTML = this.mag +"/"+this.bullets.inAction
@@ -291,26 +293,38 @@ class Player{
       }
     }
     movement(){
-      this.frictionCoefficient = 0.01**(1/fps)
-        if (keys.a.pressed && this.velocity.x > -this.terminalVelocity){
-         this.velocity.x -= this.acceleration
+      this.frictionCoefficient = 0.9**(30/fps)
+        if (keys.a.pressed){
+          if(this.velocity.x > -this.terminalVelocity){
+            this.velocity.x -= this.acceleration*0.5
+          }
         }
-        else if (keys.d.pressed && this.velocity.x < this.terminalVelocity){
-          this.velocity.x += this.acceleration
+        if (keys.d.pressed){
+          if(this.velocity.x < this.terminalVelocity){
+            this.velocity.x += this.acceleration*0.5
+          } 
         }
-        else {
+        if((!keys.a.pressed && !keys.d.pressed) ||(keys.a.pressed && keys.d.pressed) || Math.abs(this.velocity.x) > this.terminalVelocity){
             this.velocity.x *= this.frictionCoefficient
         }
-        if (keys.w.pressed && this.velocity.y > -this.terminalVelocity){
-            this.velocity.y -= this.acceleration
+        
+        if (keys.w.pressed){
+          if(this.velocity.y > -this.terminalVelocity){
+            this.velocity.y -= this.acceleration*0.5
+          }
+          if(keys.a.pressed ||keys.d.pressed){
+            this.diagonalMvt = true
+          }
+          else {this.diagonalMvt = false}
         }
-        else if (keys.s.pressed && this.velocity.y < this.terminalVelocity){
-            this.velocity.y += this.acceleration
+        if (keys.s.pressed){
+          if(this.velocity.y < this.terminalVelocity){
+            this.velocity.y += this.acceleration*0.5
+          } 
         }
-        else{
+        if((!keys.w.pressed && !keys.s.pressed) ||(keys.w.pressed && keys.s.pressed) || Math.abs(this.velocity.y) > this.terminalVelocity){
             this.velocity.y *= this.frictionCoefficient
         }
-
         if(Math.abs(this.velocity.x) > 1 || Math.abs(this.velocity.y) > 1){      
           if(noises.length > 0){
             for(let i =0;i<noises.length;i++){
@@ -412,6 +426,15 @@ class Player{
             this.mag += r
             r = 0
         }
+        if(this.weapon == 1 || this.weapon == 4){
+          this.bullets.light = r 
+        }
+        if(this.weapon == 2){
+          this.bullets.shells = r 
+        }
+        if(this.weapon == 3){
+          this.bullets.heavy = r
+        }
         this.gun.reloading = false
         this.gun.active = true
           }
@@ -419,15 +442,7 @@ class Player{
             clearTimeout(timer);
             this.gun.reloading = false
           this.gun.reloadCancel = false}
-            if(this.weapon == 1 || this.weapon == 4){
-              this.bullets.light = r 
-            }
-            if(this.weapon == 2){
-              this.bullets.shells = r 
-            }
-            if(this.weapon == 3){
-              this.bullets.heavy = r
-            }
+
       }, 2000);
     }
     else {
@@ -665,8 +680,8 @@ class Player{
       })
     }
     update(){
-      this.position.x += this.velocity.x + this.knockback.x
-      this.position.y += this.velocity.y + this.knockback.y
+      this.position.x += this.velocity.x
+      this.position.y += this.velocity.y
       if(Math.abs(this.knockback.x) > 0.1){
         this.knockback.x *= 0.7
       }
@@ -675,8 +690,13 @@ class Player{
         this.knockback.y *= 0.7
       }
       else {this.knockback.y = 0}
-
-      this.terminalVelocity = 4 * 30/fps
+      if(this.diagonalMvt)
+      {
+        this.terminalVelocity = 4*Math.sqrt(2) * 30/fps
+      }
+      else {
+        this.terminalVelocity = 4 * 30/fps
+      }
       this.acceleration = 1 * 30/fps
   
     }
@@ -2105,8 +2125,7 @@ function gameLoop(){
   // BOOL
   var drawEnd = false
   // FPS COMPUTE  
-  elapsedTime = performance.now() - then 
-  console.log(elapsedTime)
+  elapsedTime = performance.now() - then;
   if(timeSkip){
     elapsedTime = timeSkip - then
     timeSkip = 0
